@@ -32,7 +32,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, onNavigate,
   const [isTyping, setIsTyping] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [budgetData, setBudgetData] = useState<BudgetData>(INITIAL_BUDGET);
-  
+
   const [activeTrigger, setActiveTrigger] = useState<string>('');
   const [showTrigger, setShowTrigger] = useState(false);
 
@@ -42,8 +42,21 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, onNavigate,
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  
+
   const isMounted = useRef(true);
+
+  // Quick message (persistent "Falar com PH" inline)
+  const [showQuickMessage, setShowQuickMessage] = useState(false);
+  const quickMessageRef = useRef<HTMLTextAreaElement>(null);
+  const [quickMessageInput, setQuickMessageInput] = useState('');
+
+  // Contextual page awareness
+  const [pageContext, setPageContext] = useState<string>('home');
+
+  // Unread replies badge
+  const [unreadReplies, setUnreadReplies] = useState(0);
+  const [quickMessageInput, setQuickMessageInput] = useState('');
+  const quickMessageRef = useRef<HTMLTextAreaElement>(null);
 
   const { isVisible: isCookieVisible } = useCookieConsent();
   const isMobile = useMobile();
@@ -108,6 +121,49 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, onNavigate,
     };
   }, [isOpen]);
 
+  // Detect page context for personalized messages
+  useEffect(() => {
+    const hash = window.location.hash;
+    const params = new URLSearchParams(window.location.search);
+    const page = params.get('page');
+    if (page === 'blog') setPageContext('blog');
+    else if (page === 'contact') setPageContext('contact');
+    else if (page === 'portfolio') setPageContext('portfolio');
+    else if (page === 'services') setPageContext('services');
+    else if (page === 'about') setPageContext('about');
+    else if (page === 'pricing') setPageContext('pricing');
+    else setPageContext('home');
+  }, []);
+
+  // Check for unread admin replies on open
+  const checkAdminReplies = async () => {
+    try {
+      const storedName = localStorage.getItem('chat_name');
+      const storedEmail = localStorage.getItem('chat_email');
+      if (!storedName) return;
+
+      const res = await api.request<{ success: boolean; messages: any[]; total: number }>(
+        `/chat/messages${storedEmail ? `?email=${encodeURIComponent(storedEmail)}` : ''}`
+      );
+      if (res?.messages) {
+        const repliedMsgs = res.messages.filter((m: any) => m.status === 'replied' && m.admin_reply);
+        const lastRepliedId = repliedMsgs.length > 0 ? repliedMsgs[0].id : null;
+        const seenId = localStorage.getItem('chat_seen_reply_id');
+        const newReplies = repliedMsgs.filter((m: any) => m.id !== seenId);
+
+        setUnreadReplies(newReplies.length);
+
+        // If has new replies and user has name, show them
+        if (newReplies.length > 0 && storedName) {
+          const lastReply = repliedMsgs[0];
+          addBotMessage(`O PH respondeu sua mensagem! 📩\n\n"${lastReply.admin_reply}"`, 'text');
+          localStorage.setItem('chat_seen_reply_id', String(lastRepliedId));
+          setUnreadReplies(0);
+        }
+      }
+    } catch (e) { /* silent */ }
+  };
+
   const initializeChat = () => {
     setBudgetData(INITIAL_BUDGET);
     setMessages([]);
@@ -123,9 +179,61 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, onNavigate,
     if (contextService) {
         setBudgetData(prev => ({ ...prev, projectType: contextService.title }));
         processStep('start_context', { ...INITIAL_BUDGET, projectType: contextService.title });
+    } else if (budgetData.name || localStorage.getItem('chat_name')) {
+        // Returning user — use welcome_back
+        const savedData = { ...INITIAL_BUDGET, ...getSavedBudget() };
+        if (savedData.name && savedData.projectType) {
+            setBudgetData(savedData);
+            processStep('welcome_back', savedData);
+        } else {
+            processStep('start', INITIAL_BUDGET);
+        }
     } else {
+        // First-time: add contextual greeting
+        const ctxGreeting = getCtxGreeting();
+        setMessages(prev => [...prev, {
+            id: Date.now().toString(),
+            text: ctxGreeting,
+            isUser: false,
+            type: 'text'
+        }]);
         processStep('start', INITIAL_BUDGET);
     }
+
+    // Check for admin replies
+    checkAdminReplies();
+  };
+
+  // LocalStorage helpers for returning users
+  const getSavedBudget = () => {
+    try {
+      const saved = localStorage.getItem('chat_budget');
+      return saved ? JSON.parse(saved) : {};
+    } catch { return {}; }
+  };
+
+  const saveBudget = (data: BudgetData) => {
+    try {
+      localStorage.setItem('chat_budget', JSON.stringify({
+        name: data.name, email: data.email, projectType: data.projectType,
+        designStatus: data.designStatus, budgetRange: data.budgetRange,
+        timeline: data.timeline, details: data.details,
+      }));
+      if (data.name) localStorage.setItem('chat_name', data.name);
+      if (data.email) localStorage.setItem('chat_email', data.email);
+    } catch {}
+  };
+
+  // Contextual greeting based on current page
+  const getCtxGreeting = () => {
+    const greetings: Record<string, string> = {
+      portfolio: 'Vi que está olhando nossos projetos! Quer saber quanto custa algo assim? Me diz seu nome que começo seu orçamento. 😎',
+      blog: 'Gostou do conteúdo? Se quiser fazer um orçamento, é só me dizer seu nome que começo agora.',
+      services: 'Escolheu um serviço? Me diz seu nome que monto seu orçamento personalizado.',
+      contact: 'Veio para contato? Bora fazer um orçamento completo! Me diz seu nome.',
+      about: 'Quer saber mais sobre como trabalho? Posso te mostrar um orçamento agora — me diz seu nome.',
+    };
+    return greetings[pageContext] || '';
   };
 
   const handleSwitchMode = async (targetMode: 'sales' | 'support') => {
@@ -160,7 +268,32 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, onNavigate,
          processStep('design_status', currentData);
          return;
     }
-    
+
+    // Handle project status check
+    if (stepId === 'support_check_project' && currentData.email) {
+        setIsTyping(true);
+        await new Promise(resolve => setTimeout(resolve, 800));
+        if (!isMounted.current) return;
+        setIsTyping(false);
+        try {
+            const res = await api.projects.getAll();
+            const projects = res.data?.projects || [];
+            const userProjects = projects.filter((p: any) =>
+                p.client_email?.toLowerCase() === currentData.email?.toLowerCase()
+            );
+            if (userProjects.length > 0) {
+                const p = userProjects[0];
+                const statusLabels: Record<string, string> = { pending: 'Novo Lead', development: 'Em Desenvolvimento', review: 'Em Revisao', completed: 'Concluido' };
+                addBotMessage(`Encontrei seu projeto! 🎉\n\n📦 ${p.title}\n📊 Status: ${statusLabels[p.status] || p.status}\n📈 Progresso: ${p.progress}%\n📅 Entrega: ${p.deadline ? new Date(p.deadline).toLocaleDateString('pt-BR') : 'A definir'}\n\nQualquer dúvida, é só perguntar! 😊`);
+            } else {
+                addBotMessage(`Não encontrei projetos com esse e-mail. 😕\n\nQuer fazer um orçamento? Comece me dizendo seu nome!`, 'text', [
+                    { label: '🚀 Quero orçamento!', value: 'start_budget', nextId: 'check_project_type' }
+                ]);
+            }
+        } catch { addBotMessage('Não consegui buscar os projetos no momento. Tente novamente!'); }
+        return;
+    }
+
     setIsTyping(true);
     await new Promise(resolve => setTimeout(resolve, 600)); 
     
@@ -247,16 +380,39 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, onNavigate,
 
     if (value.trim()) {
         const lowerValue = value.toLowerCase();
-        
-        // SAFEGUARD: Etapas de "Texto Livre" (Público, Detalhes, Referências) não devem gatilhar suporte.
-        // Isso permite que o cliente escreva textos longos e técnicos sem ser interrompido.
+
+        // DEEP INTENT: Navigation commands — user wants to see a page
+        const navIntents: Record<string, { view: string; keywords: string[] }> = {
+            portfolio: { view: 'portfolio', keywords: ['portfolio', 'projetos', 'trabalhos'] },
+            blog: { view: 'blog', keywords: ['blog', 'artigo', 'post', 'conteúdo', 'conteudo'] },
+            services: { view: 'services', keywords: ['serviços', 'servicos', 'pacotes', 'preço', 'preco', 'orçamento', 'orcamento'] },
+            contact: { view: 'contact', keywords: ['contato', 'contato', 'email', 'fale'] },
+            about: { view: 'about', keywords: ['sobre', 'sobre mim', 'quem é você', 'quem é vc'] },
+            process: { view: 'process', keywords: ['processo', 'como funciona', 'etapas', 'método', 'metodo'] },
+            faq: { view: 'faq', keywords: ['faq', 'perguntas frequentes', 'dúvidas', 'duvidas'] },
+        };
+
         const isHeavyInputStep = ['define_audience', 'details', 'reference_note'].includes(currentStepId);
 
+        // Only trigger nav intents when not in a heavy input step
+        if (!isHeavyInputStep && lowerValue.includes('me mostra') || lowerValue.includes('me mostra') || lowerValue.includes('quero ver') || lowerValue.includes('ver ') || lowerValue.includes('ver a') || lowerValue.includes('quero saber')) {
+            for (const [, nav] of Object.entries(navIntents)) {
+                for (const kw of nav.keywords) {
+                    if (lowerValue.includes(kw)) {
+                        addUserMessage(value);
+                        setInputValue('');
+                        handleSwitchMode('sales');
+                        onNavigate(nav.view as any);
+                        return;
+                    }
+                }
+            }
+        }
+
+        // SUPPORT INTENT
         const isSupportIntent = SUPPORT_KEYWORDS.some(keyword => lowerValue.includes(keyword));
 
         if (isSupportIntent && chatMode === 'sales' && !isHeavyInputStep) {
-            // Se a mensagem for muito longa (> 50 chars), provavelmente é uma descrição e não um pedido de ajuda simples
-            // Mas se estiver em uma "Heavy Input Step", ignoramos completamente o suporte.
             if (value.length < 50) {
                 handleSwitchMode('support');
                 return;
@@ -279,6 +435,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, onNavigate,
 
     if (currentStep.nextId) {
         processStep(currentStep.nextId, newData);
+        saveBudget(newData); // persist budget on every input
     }
   };
 
@@ -304,6 +461,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, onNavigate,
       }
       
       if (option.value === 'finish') {
+          createProjectFromBudget(budgetData);
           const link = generateWhatsAppLink(budgetData);
           window.open(link, '_self');
           return;
@@ -339,9 +497,10 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, onNavigate,
       }
 
       setBudgetData(newData);
+      saveBudget(newData); // persist on every action
 
       const nextId = option.nextId || currentStep.nextId;
-      
+
       if (nextId) {
           processStep(nextId, newData);
       }
@@ -369,6 +528,30 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, onNavigate,
       }
   };
 
+  const handleDirectMessageInline = () => {
+    setShowQuickMessage(prev => !prev);
+  };
+
+  const handleQuickMessageSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickMessageInput.trim()) return;
+
+    const message = budgetData.name
+      ? `Nome: ${budgetData.name}${budgetData.email ? `\nEmail: ${budgetData.email}` : ''}\nTipo: ${budgetData.projectType || 'Não definido'}\n\nMensagem: ${quickMessageInput.trim()}`
+      : `Olá! Vim pelo chat do site.\n\nNome: ${budgetData.inputValue || 'Não informado'}\n\nMensagem: ${quickMessageInput.trim()}`;
+
+    addUserMessage(`💬 ${quickMessageInput.trim()}`);
+    setQuickMessageInput('');
+    setShowQuickMessage(false);
+
+    try {
+      await saveDirectMessage(message);
+      addBotMessage('Entendido! Sua mensagem foi enviada. O PH vai te responder em breve. 🙌');
+    } catch (err) {
+      addBotMessage('Houve um problema ao enviar. Tente novamente ou fale pelo WhatsApp. ⚠️');
+    }
+  };
+
   const saveDirectMessage = async (message: string) => {
     try {
       await api.chat.sendMessage({
@@ -377,9 +560,35 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, onNavigate,
         budget_data: budgetData,
         message,
       });
+      createProjectFromBudget(budgetData);
     } catch (e) {
       console.error('Failed to save direct message:', e);
     }
+  };
+
+  const createProjectFromBudget = (data: BudgetData) => {
+    api.projects.create({
+      client_name: data.name,
+      client_email: data.email || '',
+      client_cpf: '',
+      title: `Projeto: ${data.projectType}`,
+      financial_total: 0,
+      financial_paid: 0,
+      financial_status: 'pending',
+      status: 'pending',
+      progress: 0,
+      briefing: {
+        projectType: data.projectType,
+        designStatus: data.designStatus,
+        functionalities: data.functionalities,
+        budgetRange: data.budgetRange,
+        timeline: data.timeline,
+        targetAudience: data.targetAudience,
+        details: data.details,
+      },
+    }).catch((e) => {
+      console.error('Failed to create project from budget:', e);
+    });
   };
 
   const handleDirectContact = () => {
@@ -483,6 +692,45 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, onNavigate,
 
             {/* Messages Area */}
             <div className="flex-1 overflow-y-auto p-4 bg-gray-50 dark:bg-[#0B0D12] space-y-5 scroll-smooth relative pb-4 transition-colors duration-300">
+
+              {/* Persistent "Falar com PH" inline button */}
+              <div className="flex items-center justify-center py-1">
+                {!showQuickMessage ? (
+                  <button
+                    onClick={handleDirectMessageInline}
+                    className="inline-flex items-center gap-1.5 px-3 py-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 text-xs rounded-full transition-all active:scale-95 shadow-sm border border-gray-300 dark:border-gray-600"
+                  >
+                    💬 Falar com PH
+                  </button>
+                ) : (
+                  <form onSubmit={handleQuickMessageSubmit} className="w-full max-w-[90%] flex items-center gap-1.5">
+                    <textarea
+                      ref={quickMessageRef}
+                      value={quickMessageInput}
+                      onChange={(e) => setQuickMessageInput(e.target.value)}
+                      placeholder="Escreva sua mensagem..."
+                      rows={1}
+                      autoFocus
+                      className="flex-1 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-xs rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-primary-500/50 resize-none border border-gray-200 dark:border-gray-700"
+                    />
+                    <button
+                      type="submit"
+                      disabled={!quickMessageInput.trim()}
+                      className="p-1.5 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm bg-primary-600 hover:bg-primary-700 shrink-0"
+                    >
+                      <Send size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setShowQuickMessage(false); setQuickMessageInput(''); }}
+                      className="p-1.5 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 rounded-lg transition-colors shrink-0"
+                    >
+                      <X size={14} />
+                    </button>
+                  </form>
+                )}
+              </div>
+
               <AnimatePresence mode="popLayout">
                   {messages.map((msg, index) => {
                       const isLastMessage = index === messages.length - 1;
@@ -632,6 +880,36 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, onNavigate,
                       <div className="w-1.5 h-1.5 bg-gray-500 dark:bg-gray-400 rounded-full animate-bounce [animation-delay:0.4s]"></div>
                   </motion.div>
               )}
+            </div>
+
+            {/* Quick Replies Bar */}
+            <div className="px-4 py-1 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 shrink-0">
+                <div className="flex gap-1.5 justify-center">
+                    <button
+                        onClick={() => {
+                            if (messages.length > 0) {
+                                messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+                            } else {
+                                initializeChat();
+                            }
+                        }}
+                        className="px-2.5 py-1 text-xs bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full transition-all active:scale-95 border border-gray-200 dark:border-gray-700"
+                    >
+                        📋 Orçamento
+                    </button>
+                    <button
+                        onClick={handleDirectMessageInline}
+                        className="px-2.5 py-1 text-xs bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full transition-all active:scale-95 border border-gray-200 dark:border-gray-700"
+                    >
+                        💬 Falar com PH
+                    </button>
+                    <button
+                        onClick={() => handleSwitchMode('support')}
+                        className="px-2.5 py-1 text-xs bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full transition-all active:scale-95 border border-gray-200 dark:border-gray-700"
+                    >
+                        ❓ Dúvidas
+                    </button>
+                </div>
             </div>
 
             {/* Input Area */}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MessageSquare, Send, Clock, Check, Eye, Search } from 'lucide-react';
+import { MessageSquare, Send, Clock, Check, Eye, Search, UserPlus } from 'lucide-react';
 import { api } from '../../lib/api';
 
 interface ChatMessage {
@@ -54,6 +54,30 @@ export const ChatInbox: React.FC = () => {
       console.error('Failed to send reply:', e);
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleCreateProject = async () => {
+    if (!selected?.name) return;
+    const bData = selected.budget_data ? JSON.parse(selected.budget_data) : null;
+    try {
+      await api.projects.create({
+        client_name: selected.name,
+        client_email: selected.email || '',
+        client_cpf: '',
+        title: `Projeto: ${bData?.projectType || 'Novo projeto'}`,
+        financial_total: 0,
+        financial_paid: 0,
+        financial_status: 'pending',
+        status: 'pending',
+        progress: 0,
+        briefing: selected.budget_data,
+      });
+      alert('Projeto criado com sucesso!');
+      await fetchMessages();
+      setSelected(null);
+    } catch (e: any) {
+      alert('Erro ao criar projeto: ' + e.message);
     }
   };
 

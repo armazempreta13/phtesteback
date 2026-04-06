@@ -355,8 +355,25 @@ export const CHAT_FLOW: Record<string, ChatStep> = {
           { label: '⚙️ Tecnologias usadas', value: 'Tecnologia', nextId: 'support_tech' },
           { label: '📅 Prazos e entregas', value: 'Prazo', nextId: 'support_deadline' },
           { label: '🔧 Suporte pós-entrega', value: 'Suporte', nextId: 'support_maintenance' },
+          { label: '📊 Status do meu projeto', value: 'status_project', nextId: 'support_project_status' },
           { label: '🔙 Voltar ao orçamento', value: 'SwitchToSales', nextId: 'check_project_type' }
       ]
+  },
+
+  support_project_status: {
+      id: 'support_project_status',
+      message: "Para consultar seu projeto, me diz seu e-mail: 📧",
+      type: 'input',
+      key: 'email',
+      inputPlaceholder: "seu@email.com",
+      nextId: 'support_check_project'
+  },
+
+  support_check_project: {
+      id: 'support_check_project',
+      message: (data) => `Aguarde um momento... verificando projetos para ${data.email}... 🔍`,
+      type: 'text',
+      nextId: 'support_end'
   },
 
   support_payment: {
