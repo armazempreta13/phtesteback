@@ -324,6 +324,16 @@ export const api = {
     },
   },
 
+  // Chat messages (direct contact)
+  chat: {
+    sendMessage: async (data: { name: string; email: string; budget_data?: any; message: string }) => {
+      return request<{ success: boolean; id?: number }>('/chat/messages', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
+  },
+
   // Keep existing PIX fallback for static payments
   payment: {
     create: async (amount: number, description: string, payerEmail: string): Promise<PaymentOrder> => {

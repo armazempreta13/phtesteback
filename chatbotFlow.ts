@@ -297,9 +297,36 @@ export const CHAT_FLOW: Record<string, ChatStep> = {
     },
     type: 'summary',
     options: [
-      { label: '✅ Sim, enviar agora!', value: 'finish', nextId: 'finalize' },
+      { label: '✅ Enviar pelo WhatsApp', value: 'finish', nextId: 'finalize' },
+      { label: '💬 Fale direto comigo', value: 'direct_message', nextId: 'direct_message_confirm' },
       { label: '✏️ Corrigir algo', value: 'review', nextId: 'review_menu' }
     ]
+  },
+
+  direct_message_confirm: {
+    id: 'direct_message_confirm',
+    message: (data) => `Otimo! Vou enviar sua mensagem direto para o PH. 📩\n\nSeu resumo sera salvo e ele podera te responder por aqui.\n\nVoce quer enviar o resumo completo ou uma mensagem personalizada?`,
+    type: 'options',
+    options: [
+      { label: '📋 Enviar resumo completo', value: 'send_summary_msg', nextId: 'direct_message_sent' },
+      { label: '✏️ Escrever uma mensagem', value: 'custom_message', nextId: 'direct_message_custom' },
+      { label: '🔙 Voltar', value: 'back', nextId: 'show_summary' }
+    ]
+  },
+
+  direct_message_custom: {
+    id: 'direct_message_custom',
+    message: "Escreva sua mensagem para o PH: 👇",
+    type: 'input',
+    key: 'directMessage',
+    inputPlaceholder: "Sua mensagem...",
+    nextId: 'direct_message_sent'
+  },
+
+  direct_message_sent: {
+    id: 'direct_message_sent',
+    message: (data) => `Pronto, ${data.name}! ✅\n\nSua mensagem foi enviada com sucesso! O PH vai ver e te responder em breve.\n\nFique de olho aqui no chat! 😊`,
+    type: 'text'
   },
 
   review_menu: {
@@ -379,6 +406,7 @@ export const CHAT_FLOW: Record<string, ChatStep> = {
       options: [
           { label: '🚀 Voltar ao orçamento', value: 'SwitchToSales', nextId: 'check_project_type' },
           { label: '💬 Falar no WhatsApp', value: 'finish', nextId: 'finalize' },
+          { label: '📩 Fale direto comigo', value: 'direct_message', nextId: 'direct_message_confirm' },
           { label: '❓ Tenho outra dúvida', value: 'Mais', nextId: 'support_start' }
       ]
   },

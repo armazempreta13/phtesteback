@@ -1,0 +1,11 @@
+CREATE TABLE IF NOT EXISTS chat_messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT,
+  email TEXT,
+  budget_data TEXT,
+  message TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'unread',
+  admin_reply TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);

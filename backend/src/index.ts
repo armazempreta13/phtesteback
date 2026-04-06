@@ -18,7 +18,7 @@ import { getContract, generateContract, updateContract, revokeContract } from '.
 import { getClientProjects, getClientProject, getClientMessages, sendClientMessage } from './routes/client.routes';
 import { getSettings, updateSettings } from './routes/settings.routes';
 import { trackAnalytics } from './routes/analytics.routes';
-import { aiChat, aiChatStream } from './routes/ai.routes';
+import { submitChatMessage, listChatMessages, replyToChatMessage } from './routes/chat.routes';
 import { authMiddleware, requireAdmin, setAuthContext, verifyToken as middlewareVerifyToken, authRateLimiter } from './middleware';
 import { Env, Variables } from './app';
 
@@ -104,6 +104,11 @@ app.post('/api/contact', submitContact);
 app.post('/api/briefings', createBriefing);
 app.post('/api/transactions/:id/webhook', webhookTransaction);
 
+// Chat messages (direct conversation with admin)
+app.post('/api/chat/messages', submitChatMessage);
+app.get('/api/chat/messages', setAuthContext, authMiddleware, requireAdmin, listChatMessages);
+app.put('/api/chat/messages/:id/reply', setAuthContext, authMiddleware, requireAdmin, replyToChatMessage);
+
 // ============================================================
 // AUTH ROUTES
 // ============================================================
@@ -183,10 +188,6 @@ app.get('/api/admin/stats', setAuthContext, authMiddleware, requireAdmin, getAdm
 app.get('/api/analytics', setAuthContext, authMiddleware, requireAdmin, getAnalytics);
 app.get('/api/settings', setAuthContext, authMiddleware, requireAdmin, getSettings);
 app.put('/api/settings', setAuthContext, authMiddleware, requireAdmin, updateSettings);
-
-// AI (protected + rate limited)
-app.post('/api/ai/chat', setAuthContext, authMiddleware, aiChat);
-app.post('/api/ai/chat/stream', setAuthContext, authMiddleware, aiChatStream);
 
 // ============================================================
 // 404 FALLBACK

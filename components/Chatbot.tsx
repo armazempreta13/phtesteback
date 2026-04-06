@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { BudgetData, ChatMessage, ChatOption, ChatbotProps } from '../types';
 import { PROCESS_STEPS, CONTACT_CONFIG } from '../constants';
 import { CHAT_FLOW, INITIAL_BUDGET, generateWhatsAppLink } from '../chatbotFlow';
+import { api } from '../lib/api';
 import { useCookieConsent } from '../hooks/useCookieConsent';
 import { useMobile } from '../hooks/useMobile';
 
@@ -266,6 +267,10 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, onNavigate,
     const currentStep = CHAT_FLOW[currentStepId];
 
     const newData = { ...budgetData };
+    // Handle direct_message_custom step
+    if (currentStepId === 'direct_message_custom' && value.trim()) {
+      saveDirectMessage(value);
+    }
     if (currentStep.key && value.trim()) {
         // @ts-ignore
         newData[currentStep.key] = value;
@@ -301,6 +306,22 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, onNavigate,
       if (option.value === 'finish') {
           const link = generateWhatsAppLink(budgetData);
           window.open(link, '_self');
+          return;
+      }
+
+      if (option.value === 'send_summary_msg' && option.nextId === 'direct_message_sent') {
+          // Save summary as direct message to backend
+          const estimate = calculateEstimate(budgetData);
+          const summaryMessage = `Nome: ${budgetData.name}\nEmail: ${budgetData.email}\nTipo: ${budgetData.projectType}\nDesign: ${budgetData.designStatus}\nPrazo: ${budgetData.timeline}\nEstimativa: ${formatCurrency(estimate.min)} - ${formatCurrency(estimate.max)}`;
+          saveDirectMessage(summaryMessage);
+          addUserMessage('📋 Resumo do orçamento enviado!');
+          processStep('direct_message_sent', budgetData);
+          return;
+      }
+
+      if (option.value === 'direct_message') {
+          addUserMessage('💬 Fale direto comigo');
+          processStep('direct_message_confirm', budgetData);
           return;
       }
 
@@ -346,6 +367,19 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, onNavigate,
       if (currentStep.nextId) {
           processStep(currentStep.nextId, newData);
       }
+  };
+
+  const saveDirectMessage = async (message: string) => {
+    try {
+      await api.chat.sendMessage({
+        name: budgetData.name,
+        email: budgetData.email,
+        budget_data: budgetData,
+        message,
+      });
+    } catch (e) {
+      console.error('Failed to save direct message:', e);
+    }
   };
 
   const handleWhatsAppShortcut = () => {
