@@ -1,14 +1,9 @@
 import { Context } from 'hono';
 import type { Env } from '../index';
 import { generateJWT, validatePassword, sanitizeEmail, authRateLimiter } from '../middleware';
-import { hash, verify } from '@node-rs/argon2';
+import bcrypt from 'bcryptjs';
 
-const ARGON2_OPTIONS = {
-  memoryCost: 19456,
-  timeCost: 2,
-  outputLen: 32,
-  parallelism: 1,
-};
+const BCRYPT_ROUNDS = 12;
 
 // ============================================================
 // REGISTER
@@ -45,7 +40,7 @@ export async function register(c: Context<{ Bindings: Env; Variables: { userId: 
     }
 
     // Argon2id hashing (more secure than bcrypt)
-    const hashedPassword = await hash(password, ARGON2_OPTIONS);
+    const hashedPassword = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
     const result = await db.prepare(
       'INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)'
