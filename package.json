@@ -1,0 +1,9 @@
+{
+  "name": "phtesteback",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "build": "cd site && npm install && npm run build",
+    "deploy": "cd site && npx wrangler pages deploy dist"
+  }
+}
