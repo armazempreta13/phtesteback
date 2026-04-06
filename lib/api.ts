@@ -107,7 +107,7 @@ export const api = {
         return fetch(`${API_BASE}/analytics/track`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type, path, referrer, userAgent: navigator.userAgent }),
+          body: JSON.stringify({ type, path, referrer, user_agent: navigator.userAgent }),
         });
       } catch (e) { /* silently fail */ }
     },

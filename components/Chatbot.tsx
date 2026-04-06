@@ -72,7 +72,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, onNavigate,
       fetch(`/api/analytics/track`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'chat_open', path: window.location.pathname, userAgent: navigator.userAgent }),
+        body: JSON.stringify({ type: 'chat_open', path: window.location.pathname, user_agent: navigator.userAgent }),
       }).catch(() => {});
     }
   }, [isOpen]);

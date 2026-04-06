@@ -19,7 +19,7 @@ import { getClientProjects, getClientProject, getClientMessages, sendClientMessa
 import { getSettings, updateSettings } from './routes/settings.routes';
 import { trackAnalytics } from './routes/analytics.routes';
 import { aiChat, aiChatStream } from './routes/ai.routes';
-import { authMiddleware, requireAdmin, setAuthContext, verifyToken as middlewareVerifyToken } from './middleware';
+import { authMiddleware, requireAdmin, setAuthContext, verifyToken as middlewareVerifyToken, authRateLimiter } from './middleware';
 import { Env, Variables } from './app';
 
 const app = new Hono<{
@@ -108,7 +108,7 @@ app.post('/api/transactions/:id/webhook', webhookTransaction);
 // AUTH ROUTES
 // ============================================================
 app.post('/api/auth/register', register);
-app.post('/api/auth/login', login);
+app.post('/api/auth/login', authRateLimiter(15 * 60 * 1000, 10), login);
 app.post('/api/auth/verify', bearerAuth({
   verifyToken: async (token, c) => {
     const res = await middlewareVerifyToken(c.env.JWT_SECRET, token, c.env);

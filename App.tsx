@@ -29,7 +29,6 @@ import { ClientPortal } from './components/ClientPortal';
 import { AdminDashboard } from './components/AdminDashboard';
 import { ClientBriefingPage } from './components/ClientBriefingPage';
 
-const ChatbotV2 = React.lazy(() => import('./components/ChatbotV2').then(module => ({ default: module.ChatbotV2 })));
 const Chatbot = React.lazy(() => import('./components/Chatbot').then(module => ({ default: module.Chatbot })));
 const ZenithOnePage = React.lazy(() => import('./components/ZenithOnePage').then(module => ({ default: module.ZenithOnePage })));
 const AetherOnePage = React.lazy(() => import('./components/AetherOnePage').then(module => ({ default: module.AetherOnePage })));
@@ -58,9 +57,6 @@ function AppContent() {
   
   const [authRole, setAuthRole] = useState<'guest' | 'client' | 'admin'>('guest');
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [chatVersion, setChatVersion] = useState<'v1' | 'v2'>(() => {
-    return (localStorage.getItem('chatbot_version') as 'v1' | 'v2') || 'v1';
-  });
 
   // --- URL PARAMETER HANDLING (ROUTING) ---
   useEffect(() => {
@@ -347,38 +343,15 @@ function AppContent() {
             {/* PERSISTENT CHATBOT (Kept mounted unless full screen demo) */}
             {!isFullScreenView && (
                 <Suspense fallback={null}>
-                    {chatVersion === 'v2' ? (
-                        <ChatbotV2
-                            isOpen={isChatOpen}
-                            setIsOpen={setIsChatOpen}
-                        />
-                    ) : (
-                        <Chatbot
-                            isOpen={isChatOpen}
-                            setIsOpen={setIsChatOpen}
-                            onNavigate={handleNavigate}
-                            contextService={selectedService}
-                            extraElevation={false}
-                            initialMode={chatInitialMode}
-                        />
-                    )}
+                    <Chatbot
+                        isOpen={isChatOpen}
+                        setIsOpen={setIsChatOpen}
+                        onNavigate={handleNavigate}
+                        contextService={selectedService}
+                        extraElevation={false}
+                        initialMode={chatInitialMode}
+                    />
                 </Suspense>
-            )}
-
-            {/* CHATBOT VERSION TOGGLE (hidden in production, accessible via dev) */}
-            {!isFullScreenView && (
-                <button
-                    onClick={() => {
-                        const next = chatVersion === 'v1' ? 'v2' : 'v1';
-                        setChatVersion(next);
-                        localStorage.setItem('chatbot_version', next);
-                        setIsChatOpen(false);
-                    }}
-                    className="fixed bottom-2 left-2 z-[90] w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-800 text-[8px] font-mono text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 transition-colors cursor-pointer"
-                    title={`Chatbot ${chatVersion.toUpperCase()} - Clique para trocar`}
-                >
-                    {chatVersion.toUpperCase()}
-                </button>
             )}
 
             {PERFORMANCE_CONFIG.ENABLE_PERFORMANCE_HUD && (

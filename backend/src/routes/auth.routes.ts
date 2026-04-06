@@ -17,16 +17,6 @@ export async function register(c: Ctx) {
       return c.json({ success: false, message: 'Nome, email e senha sao obrigatorios' }, 400);
     }
 
-    // Password strength validation
-    const pwValidation = validatePassword(password);
-    if (!pwValidation.valid) {
-      return c.json({
-        success: false,
-        message: 'Senha fraca',
-        details: pwValidation.errors,
-      }, 400);
-    }
-
     const cleanEmail = sanitizeEmail(email);
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(cleanEmail)) {
@@ -116,9 +106,6 @@ export async function login(c: Ctx) {
     return c.json({ success: false, message: 'Erro ao fazer login' }, 500);
   }
 };
-
-// Add strict rate limiter to login
-const loginWithRateLimit = [authRateLimiter(15 * 60 * 1000, 10), login];
 
 // ============================================================
 // VERIFY TOKEN
