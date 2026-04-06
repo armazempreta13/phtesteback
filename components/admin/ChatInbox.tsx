@@ -42,8 +42,11 @@ export const ChatInbox: React.FC = () => {
     try {
       setSending(true);
       const res = await api.chat.reply(selected.id, replyText);
-      setMessages(prev => prev.map(m => m.id === selected.id ? res.message : m));
-      setSelected(res.message);
+      // Refresh entire list to ensure consistency
+      await fetchMessages();
+      // Find the updated message from the refreshed list
+      const updated = messages.find(m => m.id === selected.id);
+      if (updated) setSelected(updated);
       setReplyText('');
     } catch (e) {
       console.error('Failed to send reply:', e);

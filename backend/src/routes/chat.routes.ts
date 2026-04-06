@@ -10,7 +10,9 @@ type ChatCtx = Hono<ChatVars>['$'];
 
 export async function submitChatMessage(c: Ctx) {
   try {
-    const { name, email, budget_data, message } = await c.req.json();
+    const body = await c.req.json();
+    const { name, email, message } = body;
+    const budget_data = body.budget_data ? { ...body.budget_data, session_id: body.session_id || null } : { session_id: body.session_id || null };
 
     if (!message) {
       return c.json({ success: false, message: 'Message is required' }, 400);
@@ -19,7 +21,7 @@ export async function submitChatMessage(c: Ctx) {
     const result = await c.env.DB.prepare(
       `INSERT INTO chat_messages (name, email, budget_data, message, status, created_at, updated_at)
        VALUES (?, ?, ?, ?, 'unread', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
-    ).bind(name || null, email || null, budget_data ? JSON.stringify(budget_data) : null, message).run();
+    ).bind(name || null, email || null, JSON.stringify(budget_data), message).run();
 
     return c.json({
       success: true,
@@ -105,23 +107,61 @@ export async function replyToChatMessage(c: Ctx) {
 }
 
 // ============================================================
-// GET PUBLIC MESSAGES BY EMAIL — no admin auth required
+// GET PUBLIC MESSAGES — session_id or email lookup
 // Used by frontend to show admin replies to the user
+// Accepts: session_id, email, or name (any combination, at least one required)
 // ============================================================
 export async function getPublicMessages(c: Ctx['$']) {
   try {
+    const session_id = c.req.query('session_id');
     const email = c.req.query('email');
-    if (!email) {
-      return c.json({ success: false, message: 'Email is required' }, 400);
+    const name = c.req.query('name');
+
+    // Need at least one identifier
+    if (!session_id && !email && !name) {
+      return c.json({ success: false, message: 'At least one identifier is required (session_id, email, or name)' }, 400);
     }
+
+    const conditions: string[] = [];
+    const params: string[] = [];
+
+    // Since session_id is stored inside budget_data JSON,
+    // we match by email, name, or session_id inside budget_data
+    if (session_id && !email && !name) {
+      // Anonymous user: check budget_data for session_id
+      conditions.push('json_extract(budget_data, "$.session_id") = ?');
+      params.push(session_id);
+    } else if (session_id) {
+      // Session + email/name: match any identifier
+      conditions.push(`((email = ?) OR (name = ?) OR (json_extract(budget_data, "$.session_id") = ?))`);
+      params.push(email?.toLowerCase() || '', name || '', session_id);
+      if (email && name) {
+        // When we have both, the OR still works
+      }
+    } else {
+      // No session_id: match by email or name
+      if (email && name) {
+        conditions.push('(email = ? OR name = ?)');
+        params.push(email.toLowerCase(), name);
+      } else if (email) {
+        conditions.push('(email = ? OR name = ?)');
+        params.push(email.toLowerCase(), email.toLowerCase());
+      } else {
+        conditions.push('name = ?');
+        params.push(name);
+      }
+    }
+
+    // Only return messages that have admin replies
+    conditions.push('admin_reply IS NOT NULL AND admin_reply != ""');
 
     const messages = await c.env.DB.prepare(
       `SELECT id, name, email, message, admin_reply, status, created_at
        FROM chat_messages
-       WHERE email = ?
+       WHERE ${conditions.join(' AND ')}
        ORDER BY created_at DESC
        LIMIT 20`
-    ).bind(email.toLowerCase()).all();
+    ).bind(...params).all();
 
     return c.json({
       success: true,
@@ -135,26 +175,31 @@ export async function getPublicMessages(c: Ctx['$']) {
 }
 
 // ============================================================
-// GET UNREAD COUNT — by email (for badge display)
+// GET UNREAD COUNT — by session_id or email
 // ============================================================
 export async function getUnreadCount(c: Ctx['$']) {
   try {
-    const email = c.req.param('email');
-    if (!email) {
-      return c.json({ success: false, message: 'Email is required' }, 400);
+    const email = c.req.query('email');
+    const session_id = c.req.query('session_id');
+
+    let query = `SELECT COUNT(*) as total FROM chat_messages WHERE admin_reply IS NOT NULL AND admin_reply != ''`;
+    const params: string[] = [];
+
+    if (session_id) {
+      query += ' AND json_extract(budget_data, "$.session_id") = ?';
+      params.push(session_id);
+    } else if (email) {
+      query += ' AND (email = ? OR name = ?)';
+      params.push(email.toLowerCase(), email.toLowerCase());
+    } else {
+      return c.json({ success: false, message: 'Email or session_id required' }, 400);
     }
 
-    // Count messages that have admin_reply but belong to this email
-    // A "new reply" means status = 'replied' and admin_reply is not null
-    const result = await c.env.DB.prepare(
-      `SELECT COUNT(*) as total FROM chat_messages
-       WHERE email = ? AND status = 'replied' AND admin_reply IS NOT NULL`
-    ).bind(email.toLowerCase()).first<{ total: number }>();
+    const result = await c.env.DB.prepare(query).bind(...params).first<{ total: number }>();
 
     return c.json({
       success: true,
       data: { unread: result?.total || 0 },
-      email,
     });
   } catch (error: any) {
     console.error('Error getting unread count:', error);

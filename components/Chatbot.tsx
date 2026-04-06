@@ -22,6 +22,16 @@ const SUPPORT_KEYWORDS = [
   'não entendi', 'como funciona', 'explica'
 ];
 
+// Generate or retrieve persistent session ID for anonymous users
+const getSessionId = (): string => {
+  let sid = localStorage.getItem('chat_session_id');
+  if (!sid) {
+    sid = 'sess_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+    localStorage.setItem('chat_session_id', sid);
+  }
+  return sid;
+};
+
 export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, onNavigate, contextService, extraElevation, initialMode }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isTyping, setIsTyping] = useState(false);
@@ -35,6 +45,9 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, onNavigate,
   const [selectedMultiOptions, setSelectedMultiOptions] = useState<string[]>([]);
   const [chatMode, setChatMode] = useState<'sales' | 'support'>('sales');
 
+  const sessionId = useRef<string>(getSessionId());
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const isMounted = useRef(true);
@@ -43,7 +56,11 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, onNavigate,
   const [pageContext, setPageContext] = useState<string>('home');
 
   // Unread replies badge
-  const [unreadReplies, setUnreadReplies] = useState(0);
+  const [unreadReplies, setUnreadReplies] = useState(() => {
+    if (typeof window === 'undefined') return 0;
+    const stored = localStorage.getItem('chat_unread_count');
+    return stored ? parseInt(stored, 10) : 0;
+  });
 
   const { isVisible: isCookieVisible } = useCookieConsent();
   const isMobile = useMobile();
@@ -122,43 +139,54 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, onNavigate,
     else setPageContext('home');
   }, []);
 
-  // Check for unread admin replies on open
-  const checkAdminReplies = async () => {
+  // Check for unread admin replies
+  const checkAdminReplies = async (skipSeenCheck = false) => {
     try {
+      // Build query — prefer email, fallback to session_id
       const storedEmail = localStorage.getItem('chat_email');
-      if (!storedEmail) return;
+      const storedName = localStorage.getItem('chat_name');
+      const sid = sessionId.current;
 
-      const res = await fetch(
-        `/api/chat/messages/public?email=${encodeURIComponent(storedEmail)}`
-      );
+      const params = new URLSearchParams();
+      // Primary: session_id for anonymous/any users
+      params.set('session_id', sid);
+      // Also include name/email for matching
+      if (storedName) params.set('name', storedName);
+      if (storedEmail) params.set('email', storedEmail);
+
+      const res = await fetch(`/api/chat/messages/public?${params.toString()}`);
       const data = await res.json();
-      if (data?.success && data.messages) {
-        const repliedMsgs = data.messages.filter((m: any) => m.admin_reply);
-        if (repliedMsgs.length > 0) {
-          const seenIds = JSON.parse(localStorage.getItem('chat_seen_reply_ids') || '[]');
-          const newReplies = repliedMsgs.filter((m: any) => !seenIds.includes(m.id));
+      if (!data?.success || !data.messages) return;
 
-          setUnreadReplies(newReplies.length);
+      if (data.messages.length === 0) {
+        setUnreadReplies(0);
+        return;
+      }
 
-          if (newReplies.length > 0) {
-            // Show replies as notification cards, not bot messages
-            for (const reply of newReplies) {
-              const replyDate = new Date(reply.created_at).toLocaleDateString('pt-BR', {
-                day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
-              });
-              setMessages(prev => [...prev, {
-                id: `reply-${reply.id}`,
-                text: '',
-                isUser: false,
-                type: 'admin-reply',
-                meta: { name: reply.admin_reply, date: replyDate, originalMsg: reply.message }
-              }]);
-            }
-            const allSeenIds = [...seenIds, ...newReplies.map((m: any) => m.id)];
-            localStorage.setItem('chat_seen_reply_ids', JSON.stringify(allSeenIds));
-            setUnreadReplies(0);
-          }
+      const seenIds = skipSeenCheck ? [] : JSON.parse(localStorage.getItem('chat_seen_reply_ids') || '[]');
+      const newReplies = data.messages.filter((m: any) => !seenIds.includes(String(m.id)));
+
+      setUnreadReplies(newReplies.length);
+      localStorage.setItem('chat_unread_count', String(newReplies.length));
+
+      // Only inject messages if they haven't been seen
+      if (newReplies.length > 0) {
+        for (const reply of newReplies) {
+          const replyDate = new Date(reply.created_at).toLocaleDateString('pt-BR', {
+            day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
+          });
+          setMessages(prev => [...prev, {
+            id: `reply-${reply.id}`,
+            text: '',
+            isUser: false,
+            type: 'admin-reply',
+            meta: { name: reply.admin_reply, date: replyDate, originalMsg: reply.message }
+          }]);
         }
+        const allSeenIds = [...seenIds, ...newReplies.map((m: any) => String(m.id))];
+        localStorage.setItem('chat_seen_reply_ids', JSON.stringify(allSeenIds));
+        setUnreadReplies(0);
+        localStorage.setItem('chat_unread_count', '0');
       }
     } catch (e) { /* silent */ }
   };
@@ -166,6 +194,8 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, onNavigate,
   const initializeChat = () => {
     setBudgetData(INITIAL_BUDGET);
     setMessages([]);
+    setUnreadReplies(0);
+    localStorage.setItem('chat_unread_count', '0');
     
     if (initialMode === 'support') {
         setChatMode('support');
@@ -198,10 +228,39 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, onNavigate,
         }]);
         processStep('start', INITIAL_BUDGET);
     }
-
-    // Check for admin replies
-    checkAdminReplies();
   };
+
+  // Check for admin replies after initial messages are rendered
+  useEffect(() => {
+    if (!isOpen) return;
+    // Small delay so bot messages render first
+    const timer = setTimeout(() => checkAdminReplies(true), 800);
+    return () => clearTimeout(timer);
+  }, [isOpen]);
+
+  // Poll for new replies while chat is open
+  useEffect(() => {
+    if (!isOpen) {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+      return;
+    }
+
+    // Start polling after 20s, every 15s
+    const timer = setTimeout(() => {
+      pollingRef.current = setInterval(() => checkAdminReplies(), 15000);
+    }, 20000);
+
+    return () => {
+      clearTimeout(timer);
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
+  }, [isOpen]);
 
   // LocalStorage helpers for returning users
   const getSavedBudget = () => {
@@ -534,6 +593,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, onNavigate,
         email: budgetData.email,
         budget_data: budgetData,
         message,
+        session_id: sessionId.current,
       });
       createProjectFromBudget(budgetData);
     } catch (e) {
@@ -894,10 +954,16 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, onNavigate,
 
              <MessageCircle size={32} fill="currentColor" className="relative z-10" />
 
-             <span className="absolute top-0 right-0 flex h-4 w-4">
-               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-               <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500 border-2 border-white dark:border-gray-900"></span>
-             </span>
+             {unreadReplies > 0 ? (
+               <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[22px] h-[22px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full border-2 border-white dark:border-gray-900 shadow-sm">
+                 {unreadReplies > 9 ? '9+' : unreadReplies}
+               </span>
+             ) : (
+               <span className="absolute top-0 right-0 flex h-4 w-4">
+                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                 <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500 border-2 border-white dark:border-gray-900"></span>
+               </span>
+             )}
            </button>
         </div>
       )}
