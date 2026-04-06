@@ -1,9 +1,27 @@
 {
-  "name": "phtesteback",
+  "name": "p-hstatic",
   "private": true,
-  "version": "1.0.0",
+  "version": "0.0.0",
+  "type": "module",
   "scripts": {
-    "build": "cd site && npm install && npm run build",
-    "deploy": "cd site && npx wrangler pages deploy dist"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@google/genai": "^1.40.0",
+    "@supabase/supabase-js": "^2.87.0",
+    "framer-motion": "^12.23.24",
+    "lucide-react": "^0.555.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-helmet-async": "^2.0.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "terser": "^5.46.1",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0"
   }
 }
