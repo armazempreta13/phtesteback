@@ -329,7 +329,9 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, onNavigate,
     let options = step.options;
     if (step.dynamicOptions) options = step.dynamicOptions(currentData);
 
-    addBotMessage(msgText, step.type, options);
+    // Apply message variant based on user profile
+    const variantMsg = getMessageVariant(msgText, conversationMemoryRef.current);
+    addBotMessage(variantMsg, step.type, options);
 
     // Update progress
     if (stepId.startsWith('recovery_')) { setAnsweredSteps(0); setTotalSteps(0); }
@@ -366,7 +368,6 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, onNavigate,
 
     // Hesitation — offer help without advancing
     if (intent.type === 'hesitation') {
-      memoryUpdate.hesitations = (memoryUpdate.hesitations || 0) + 1;
       conversationMemoryRef.current.hesitations++;
       return { handled: true, shouldAdvance: false };
     }
@@ -702,6 +703,43 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, onNavigate,
   };
 
   const RocketIcon = ({ size = 16, className = '' }: { size?: number; className?: string }) => <Globe size={size} className={className} />;
+
+  // ============================================================
+  // MESSAGE VARIANTS — adapt based on user profile
+  // ============================================================
+  const getMessageVariant = (baseMsg: string, memory?: ConversationMemory): string => {
+    if (!memory) return baseMsg;
+    const { seemsRushing, seemsUnsure, seemsTechnical } = memory.detectedProfile;
+
+    // User is rushing — add calming detail
+    if (seemsRushing) {
+      if (baseMsg.includes('So mais') || baseMsg.includes('perguntas rapidas')) {
+        return baseMsg + ' Sem pressa, va no seu ritmo. 🧘';
+      }
+    }
+
+    // User seems unsure — add reassurance
+    if (seemsUnsure) {
+      if (baseMsg.includes('estimativa') || baseMsg.includes('orcamento ficou assim')) {
+        return baseMsg.replace(`Can enviar esse pro PH?`, `Sem compromisso! Posso enviar pro PH ou voce pode ajustar. O que prefere?`);
+      }
+      if (baseMsg.includes('funcionar de verdade')) {
+        return `Vamos escolher juntos — nao se preocupe, pode selecionar poucos ou nenhum. Sem errar aqui. 😊\n\nSelecione o que fizer sentido:`;
+      }
+    }
+
+    // User seems technical — use more direct language
+    if (seemsTechnical) {
+      if (baseMsg.includes('assistente do PH')) {
+        return `Boa! Sou o sistema de orcamento automatizado do PH. Parseio keywords e monto estimativas em tempo real.\n\nComo posso te chamar?`;
+      }
+      if (baseMsg.includes('10 perguntas e eu te dou')) {
+        return `Flow: 8 inputs → estimativa real-time. Sem IA, tudo rule-based.\n\nComo posso te chamar?`;
+      }
+    }
+
+    return baseMsg;
+  };
 
   const currentStep = CHAT_FLOW[currentStepId];
   const isInputDisabled = isTyping || currentStep?.type !== 'input';
