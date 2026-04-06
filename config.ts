@@ -201,7 +201,7 @@ export const SERVICE_PACKAGES: ServicePackage[] = [
     notIncluded: [
       "Painel Administrativo (Wordpress/CMS)",
       "Criação de Logo ou Identidade Visual",
-      "Banco de Dados ou Login de Usuário"
+      "Banco de Dados, Backend ou Login de Usuário"
     ],
     timeline: "3 a 7 dias úteis.",
     faqs: [

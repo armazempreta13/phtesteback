@@ -2,7 +2,7 @@
 import React from 'react';
 import { LucideIcon } from 'lucide-react';
 
-export type ViewType = 'home' | 'about' | 'services' | 'portfolio' | 'process' | 'contact' | 'zenith-demo' | 'aether-demo' | '404' | 'terms' | 'privacy' | 'blog' | 'faq' | 'login' | 'client-portal' | 'admin-dashboard' | 'briefing';
+export type ViewType = 'home' | 'about' | 'services' | 'portfolio' | 'process' | 'contact' | 'zenith-demo' | 'aether-demo' | 'nexus-demo' | 'aura-demo' | 'vertex-demo' | '404' | 'terms' | 'privacy' | 'blog' | 'faq' | 'login' | 'client-portal' | 'admin-dashboard' | 'briefing';
 
 export interface NavItem {
   label: string;

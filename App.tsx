@@ -32,6 +32,9 @@ import { ClientBriefingPage } from './components/ClientBriefingPage';
 const Chatbot = React.lazy(() => import('./components/ChatbotV3').then(module => ({ default: module.Chatbot })));
 const ZenithOnePage = React.lazy(() => import('./components/ZenithOnePage').then(module => ({ default: module.ZenithOnePage })));
 const AetherOnePage = React.lazy(() => import('./components/AetherOnePage').then(module => ({ default: module.AetherOnePage })));
+const NexusSite = React.lazy(() => import('./portfolio-sites/nexus').then(module => ({ default: module.NexusSite })));
+const AuraSite = React.lazy(() => import('./portfolio-sites/aura').then(module => ({ default: module.AuraSite })));
+const VertexSite = React.lazy(() => import('./portfolio-sites/vertex').then(module => ({ default: module.VertexSite })));
 const Footer = React.lazy(() => import('./components/Footer').then(module => ({ default: module.Footer })));
 const PerformanceHud = React.lazy(() => import('./components/PerformanceHud').then(module => ({ default: module.PerformanceHud })));
 const NotificationCenter = React.lazy(() => import('./components/NotificationCenter').then(module => ({ default: module.NotificationCenter })));
@@ -162,7 +165,7 @@ function AppContent() {
   }, [isMobileMenuOpen]);
 
   // --- EXCLUSIVE FULL SCREEN VIEWS ---
-  const isFullScreenView = ['admin-dashboard', 'client-portal', 'zenith-demo', 'aether-demo', 'briefing'].includes(currentView);
+  const isFullScreenView = ['admin-dashboard', 'client-portal', 'zenith-demo', 'aether-demo', 'nexus-demo', 'aura-demo', 'vertex-demo', 'briefing'].includes(currentView);
 
   return (
     <HelmetProvider>
@@ -280,6 +283,24 @@ function AppContent() {
                 {currentView === 'aether-demo' && (
                     <Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-slate-950 text-orange-500 font-mono">INICIALIZANDO SISTEMAS...</div>}>
                         <AetherOnePage onBack={() => handleNavigate('portfolio')} />
+                    </Suspense>
+                )}
+
+                {currentView === 'nexus-demo' && (
+                    <Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-[#1a1a2e] text-white">Carregando Nexus...</div>}>
+                        <NexusSite onBack={() => handleNavigate('portfolio')} />
+                    </Suspense>
+                )}
+
+                {currentView === 'aura-demo' && (
+                    <Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-[#faf8f0] text-[#4a443a]">Carregando Aura...</div>}>
+                        <AuraSite onBack={() => handleNavigate('portfolio')} />
+                    </Suspense>
+                )}
+
+                {currentView === 'vertex-demo' && (
+                    <Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-[#0f172a] text-white">Carregando Vertex...</div>}>
+                        <VertexSite onBack={() => handleNavigate('portfolio')} />
                     </Suspense>
                 )}
 
