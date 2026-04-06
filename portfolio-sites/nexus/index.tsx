@@ -198,7 +198,7 @@ export const NexusSite: React.FC<NexusProps> = ({ onBack }) => {
           <motion.div {...{...fadeUp, transition: { delay: 0 }}} className="text-center mb-20">
             <span className="font-inter text-[#c9a84c] text-[10px] uppercase tracking-[0.4em] font-semibold">What We Do</span>
             <h2 className="font-playfair text-4xl md:text-5xl mt-4 mb-6">Our Services</h2>
-          </div>
+          </motion.div>
           <div className="grid md:grid-cols-3 gap-8">
             {[
               { icon: PenTool, title: 'Interior Design', desc: 'Curating interiors that balance aesthetics and livability. From concept to final styling, we craft spaces that feel both intentional and effortless.' },
