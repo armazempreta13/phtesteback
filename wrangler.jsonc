@@ -24,6 +24,6 @@
     }
   ],
   "build": {
-    "command": "npm install && npm run build"
+    "command": "npm install && npm install --prefix backend && npm run build"
   }
 }
