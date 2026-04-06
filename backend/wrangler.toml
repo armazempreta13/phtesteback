@@ -1,0 +1,27 @@
+name = "phdev-api"
+main = "src/index.ts"
+compatibility_date = "2025-03-01"
+compatibility_flags = ["nodejs_compat"]
+
+# D1 Database
+[[d1_databases]]
+binding = "DB"
+database_name = "phdev-db"
+database_id = "DATABASE_ID_PLACEHOLDER"
+migrations_dir = "migrations"
+
+# KV for sessions, rate limiting, and blacklist
+[[kv_namespaces]]
+binding = "KV"
+id = "KV_ID_PLACEHOLDER"
+
+# R2 for file uploads
+[[r2_buckets]]
+binding = "UPLOADS"
+bucket_name = "phdev-uploads"
+
+[vars]
+NODE_ENV = "production"
+
+[env.preview]
+name = "phdev-api-preview"
