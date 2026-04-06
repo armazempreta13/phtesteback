@@ -2,7 +2,6 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { secureHeaders } from 'hono/secure-headers';
 import { bearerAuth } from 'hono/bearer-auth';
-import { rateLimiter } from 'hono-rate-limiter';
 import { getConnInfo } from 'hono/cloudflare-workers';
 
 import { register, login, verifyToken, getProfile, updateProfile, changePassword } from './routes/auth.routes';
@@ -68,14 +67,34 @@ app.use('/api/*', cors({
 }));
 
 // ============================================================
-// GLOBAL RATE LIMITER
+// GLOBAL RATE LIMITER (CF-compatible - no setInterval)
 // ============================================================
-app.use('/api/*', rateLimiter({
-  windowMs: 60 * 1000,
-  limit: 300,
-  standardHeaders: true,
-  legacyHeaders: false,
-}));
+const RATE_WINDOWS = new Map<string, { count: number; resetAt: number }>();
+
+app.use('/api/*', async (c, next) => {
+  const ip = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'unknown';
+  const now = Date.now();
+  const windowMs = 60 * 1000;
+  const maxRequests = 300;
+  const record = RATE_WINDOWS.get(ip);
+
+  if (record && now < record.resetAt) {
+    if (record.count >= maxRequests) {
+      return c.json({ success: false, message: 'Too many requests. Try again later.' }, 429);
+    }
+    record.count++;
+  } else {
+    RATE_WINDOWS.set(ip, { count: 1, resetAt: now + windowMs });
+  }
+
+  if (RATE_WINDOWS.size > 10000) {
+    for (const [key, val] of RATE_WINDOWS) {
+      if (val.resetAt < now) RATE_WINDOWS.delete(key);
+    }
+  }
+
+  await next();
+});
 
 // ============================================================
 // REQUEST LOGGER
