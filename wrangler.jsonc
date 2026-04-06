@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "phstatic",
+  "name": "phtesteback",
   "compatibility_date": "2026-04-06",
   "main": "backend/src/index.ts",
   "compatibility_flags": ["nodejs_compat"],
