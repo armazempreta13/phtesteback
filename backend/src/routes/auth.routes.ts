@@ -1,5 +1,5 @@
 import { Context } from 'hono';
-import type { Env } from '../index';
+import type { Ctx } from '../app';
 import { generateJWT, validatePassword, sanitizeEmail, authRateLimiter } from '../middleware';
 import bcrypt from 'bcryptjs';
 
@@ -8,7 +8,7 @@ const BCRYPT_ROUNDS = 12;
 // ============================================================
 // REGISTER
 // ============================================================
-export async function register(c: Context<{ Bindings: Env; Variables: { userId: number; userRole: string; userEmail: string } }>) {
+export async function register(c: Ctx) {
   try {
     const body = await c.req.json();
     const { name, email, password } = body;
@@ -64,7 +64,7 @@ export async function register(c: Context<{ Bindings: Env; Variables: { userId: 
 // ============================================================
 // LOGIN — with strict rate limiting and secure cookie
 // ============================================================
-export const login: typeof register = async (c) => {
+export async function login(c: Ctx) {
   try {
     const body = await c.req.json();
     const { email, password } = body;
@@ -81,8 +81,8 @@ export const login: typeof register = async (c) => {
       return c.json({ success: false, message: 'Email ou senha incorretos' }, 401);
     }
 
-    // Verify password with argon2
-    const validPassword = await verify(user.password, password, ARGON2_OPTIONS);
+    // Verify password
+    const validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword) {
       return c.json({ success: false, message: 'Email ou senha incorretos' }, 401);
     }
@@ -123,7 +123,7 @@ const loginWithRateLimit = [authRateLimiter(15 * 60 * 1000, 10), login];
 // ============================================================
 // VERIFY TOKEN
 // ============================================================
-export async function verifyToken(c: Context<{ Bindings: Env; Variables: { userId: number; userRole: string; userEmail: string } }>) {
+export async function verifyToken(c: Ctx) {
   try {
     const db = c.env.DB;
     const userId = c.get('userId');
@@ -145,7 +145,7 @@ export async function verifyToken(c: Context<{ Bindings: Env; Variables: { userI
 // ============================================================
 // GET PROFILE
 // ============================================================
-export async function getProfile(c: Context<{ Bindings: Env; Variables: { userId: number; userRole: string; userEmail: string } }>) {
+export async function getProfile(c: Ctx) {
   try {
     const userId = c.get('userId');
     const db = c.env.DB;
@@ -167,7 +167,7 @@ export async function getProfile(c: Context<{ Bindings: Env; Variables: { userId
 // ============================================================
 // UPDATE PROFILE
 // ============================================================
-export async function updateProfile(c: Context<{ Bindings: Env; Variables: { userId: number; userRole: string; userEmail: string } }>) {
+export async function updateProfile(c: Ctx) {
   try {
     const userId = c.get('userId');
     const body = await c.req.json();
@@ -195,7 +195,7 @@ export async function updateProfile(c: Context<{ Bindings: Env; Variables: { use
 // ============================================================
 // CHANGE PASSWORD
 // ============================================================
-export async function changePassword(c: Context<{ Bindings: Env; Variables: { userId: number; userRole: string; userEmail: string } }>) {
+export async function changePassword(c: Ctx) {
   try {
     const userId = c.get('userId');
     const body = await c.req.json();
@@ -216,12 +216,12 @@ export async function changePassword(c: Context<{ Bindings: Env; Variables: { us
       return c.json({ success: false, message: 'Usuario nao encontrado' }, 404);
     }
 
-    const validPassword = await verify(user.password, currentPassword, ARGON2_OPTIONS);
+    const validPassword = await bcrypt.compare(currentPassword, user.password);
     if (!validPassword) {
       return c.json({ success: false, message: 'Senha atual incorreta' }, 401);
     }
 
-    const hashedNewPassword = await hash(newPassword, ARGON2_OPTIONS);
+    const hashedNewPassword = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
     await db.prepare(
       'UPDATE users SET password = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
     ).bind(hashedNewPassword, userId).run();

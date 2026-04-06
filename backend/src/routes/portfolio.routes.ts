@@ -1,7 +1,4 @@
-import { Context } from "hono";
-import type { Env, Variables } from "../app";
-
-type Ctx = { Bindings: Env; Variables: Variables };
+import type { Ctx } from "../app";
 
 function sanitize(str: string | undefined): string {
   if (!str) return "";
@@ -22,15 +19,11 @@ export async function listPortfolio(c: Ctx) {
       where = " WHERE featured = 1";
     }
 
-    const countResult = c.env.DB.prepare(`SELECT COUNT(*) as total FROM portfolio${where}`).bind(...params).first<{ total: number }>()!;
-    const total = countResult.total;
-
-    const dataResult = c.env.DB
-      .prepare(`${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`)
-      .bind(...[...params, limit, (page - 1) * limit]);
+    const countResult = await c.env.DB.prepare(`SELECT COUNT(*) as total FROM portfolio${where}`).bind(...params).first<{ total: number }>();
+    const total = countResult?.total || 0;
 
     // D1 bind doesn't spread empty arrays well, rebuild with explicit binding
-    const allResults = c.env.DB.prepare(`SELECT * FROM portfolio${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`).bind(...[...params, limit, (page - 1) * limit]).all();
+    const allResults = await c.env.DB.prepare(`SELECT * FROM portfolio${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`).bind(...[...params, limit, (page - 1) * limit]).all();
 
     return c.json({
       success: true,
@@ -39,17 +32,17 @@ export async function listPortfolio(c: Ctx) {
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Unknown error";
-    return c.json({ success: false, message: `Failed to fetch portfolio items: ${msg}` }, 500);
+    return c.json({ success: false, message: `Failed to fetch portfolio items: ${msg || "Unknown error"}` }, 500);
   }
 }
 
 // ---- GET /portfolio/:id ----
 export async function getPortfolioItem(c: Ctx) {
   try {
-    const id = parseInt(c.req.param("id"));
+    const id = parseInt(c.req.param("id") || "0");
     if (isNaN(id)) return c.json({ success: false, message: "Invalid portfolio ID" }, 400);
 
-    const item = c.env.DB.prepare("SELECT * FROM portfolio WHERE id = ?").bind(id).first();
+    const item = await c.env.DB.prepare("SELECT * FROM portfolio WHERE id = ?").bind(id).first();
     if (!item) return c.json({ success: false, message: "Portfolio item not found" }, 404);
 
     return c.json({ success: true, data: item });
@@ -78,7 +71,7 @@ export async function createPortfolioItem(c: Ctx) {
 
     if (!body.title) return c.json({ success: false, message: "Title is required" }, 400);
 
-    const result = c.env.DB
+    const result = await c.env.DB
       .prepare(
         `INSERT INTO portfolio (title, description, image_url, gallery, tech_stack, live_url, github_url, category, featured, client_name, year)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
@@ -101,14 +94,14 @@ export async function createPortfolioItem(c: Ctx) {
     return c.json({ success: true, data: { id: result.meta.last_row_id }, message: "Portfolio item created" }, 201);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Unknown error";
-    return c.json({ success: false, message: `Failed to create portfolio item: ${msg}` }, 500);
+    return c.json({ success: false, message: `Failed to create portfolio item: ${msg || "Unknown error"}` }, 500);
   }
 }
 
 // ---- PUT /portfolio/:id ----
 export async function updatePortfolioItem(c: Ctx) {
   try {
-    const id = parseInt(c.req.param("id"));
+    const id = parseInt(c.req.param("id") || "0");
     if (isNaN(id)) return c.json({ success: false, message: "Invalid portfolio ID" }, 400);
 
     const body = await c.req.json<{
@@ -125,13 +118,13 @@ export async function updatePortfolioItem(c: Ctx) {
       year?: number;
     }>();
 
-    const current = c.env.DB.prepare("SELECT * FROM portfolio WHERE id = ?").bind(id).first() as Record<string, any>;
+    const current = await c.env.DB.prepare("SELECT * FROM portfolio WHERE id = ?").bind(id).first<Record<string, any>>();
     if (!current) return c.json({ success: false, message: "Portfolio item not found" }, 404);
 
     const gallery = body.gallery !== undefined ? (typeof body.gallery === "string" ? body.gallery : JSON.stringify(body.gallery)) : current.gallery;
     const tech_stack = body.tech_stack !== undefined ? (typeof body.tech_stack === "string" ? body.tech_stack : JSON.stringify(body.tech_stack)) : current.tech_stack;
 
-    c.env.DB
+    await c.env.DB
       .prepare(
         `UPDATE portfolio SET title = ?, description = ?, image_url = ?, gallery = ?, tech_stack = ?, live_url = ?, github_url = ?, category = ?, featured = ?, client_name = ?, year = ? WHERE id = ?`
       )
@@ -154,24 +147,24 @@ export async function updatePortfolioItem(c: Ctx) {
     return c.json({ success: true, message: "Portfolio item updated" });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Unknown error";
-    return c.json({ success: false, message: `Failed to update portfolio item: ${msg}` }, 500);
+    return c.json({ success: false, message: `Failed to update portfolio item: ${msg || "Unknown error"}` }, 500);
   }
 }
 
 // ---- DELETE /portfolio/:id ----
 export async function deletePortfolioItem(c: Ctx) {
   try {
-    const id = parseInt(c.req.param("id"));
+    const id = parseInt(c.req.param("id") || "0");
     if (isNaN(id)) return c.json({ success: false, message: "Invalid portfolio ID" }, 400);
 
-    const existing = c.env.DB.prepare("SELECT id FROM portfolio WHERE id = ?").bind(id).first();
+    const existing = await c.env.DB.prepare("SELECT id FROM portfolio WHERE id = ?").bind(id).first();
     if (!existing) return c.json({ success: false, message: "Portfolio item not found" }, 404);
 
-    c.env.DB.prepare("DELETE FROM portfolio WHERE id = ?").bind(id).run();
+    await c.env.DB.prepare("DELETE FROM portfolio WHERE id = ?").bind(id).run();
 
     return c.json({ success: true, message: "Portfolio item deleted" });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Unknown error";
-    return c.json({ success: false, message: `Failed to delete portfolio item: ${msg}` }, 500);
+    return c.json({ success: false, message: `Failed to delete portfolio item: ${msg || "Unknown error"}` }, 500);
   }
 }

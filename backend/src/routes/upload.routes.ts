@@ -1,5 +1,4 @@
-import { Context } from 'hono';
-import type { Env } from '../index';
+import type { Ctx } from '../app';
 
 const ALLOWED_MIME_TYPES = new Set([
   'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
@@ -17,7 +16,7 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 // ============================================================
 // UPLOAD FILE — saves to R2
 // ============================================================
-export async function uploadFile(c: Context<{ Bindings: Env; Variables: { userId: number; userEmail: string } }>) {
+export async function uploadFile(c: Ctx) {
   try {
     const formData = await c.req.formData();
     const file = formData.get('file') as File | null;
@@ -69,18 +68,18 @@ export async function uploadFile(c: Context<{ Bindings: Env; Variables: { userId
         url: `/api/upload/${encodeURIComponent(key)}`,
       },
     }, 201);
-  } catch (err) {
-    console.error('Upload file error:', err);
-    return c.json({ success: false, message: 'Erro no upload do arquivo' }, 500);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Unknown error";
+    return c.json({ success: false, message: `Erro no upload do arquivo: ${msg || "Unknown error"}` }, 500);
   }
 }
 
 // ============================================================
 // DOWNLOAD FILE — verifies ownership
 // ============================================================
-export async function downloadFile(c: Context<{ Bindings: Env; Variables: { userId: number; userEmail: string } }>) {
+export async function downloadFile(c: Ctx) {
   try {
-    const filename = decodeURIComponent(c.req.param('filename'));
+    const filename = decodeURIComponent(c.req.param('filename') || "");
     const userId = c.get('userId');
     const userRole = c.get('userRole');
 
@@ -109,16 +108,16 @@ export async function downloadFile(c: Context<{ Bindings: Env; Variables: { user
     headers.set('Content-Disposition', `attachment; filename="${encodeURIComponent(fileInfo.originalname)}"`);
 
     return new Response(object.body, { headers });
-  } catch (err) {
-    console.error('Download file error:', err);
-    return c.json({ success: false, message: 'Erro ao baixar arquivo' }, 500);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Unknown error";
+    return c.json({ success: false, message: `Erro ao baixar arquivo: ${msg || "Unknown error"}` }, 500);
   }
 }
 
 // ============================================================
 // LIST USER UPLOADS
 // ============================================================
-export async function listUserUploads(c: Context<{ Bindings: Env; Variables: { userId: number; userEmail: string } }>) {
+export async function listUserUploads(c: Ctx) {
   try {
     const userId = c.get('userId');
     const userRole = c.get('userRole');
@@ -136,8 +135,8 @@ export async function listUserUploads(c: Context<{ Bindings: Env; Variables: { u
     }
 
     return c.json({ success: true, data: { uploads } });
-  } catch (err) {
-    console.error('List uploads error:', err);
-    return c.json({ success: false, message: 'Erro ao listar arquivos' }, 500);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Unknown error";
+    return c.json({ success: false, message: `Erro ao listar arquivos: ${msg || "Unknown error"}` }, 500);
   }
 }

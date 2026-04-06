@@ -1,22 +1,6 @@
 import { Context, MiddlewareHandler } from 'hono';
 import { sign, verify } from 'hono/jwt';
-
-type Env = {
-  JWT_SECRET: string;
-  AI_API_KEY: string;
-  AI_MODEL: string;
-  CORS_ORIGIN: string;
-  ADMIN_EMAIL: string;
-  ADMIN_PASSWORD: string;
-  WEBHOOK_SECRET: string;
-  NODE_ENV: string;
-};
-
-type Variables = {
-  userId: number;
-  userRole: string;
-  userEmail: string;
-};
+import type { Env, Variables } from '../app';
 
 // ============================================================
 // JWT Helpers — secure httpOnly cookie based auth
@@ -34,7 +18,7 @@ export async function generateJWT(payload: { id: number; email: string; role: st
 
 export async function verifyJWT(token: string, secret: string): Promise<{ id: number; email: string; role: string } | null> {
   try {
-    const decoded = await verify(token, secret) as any;
+    const decoded = await verify(token, secret, 'HS256') as any;
     return { id: decoded.id, email: decoded.email, role: decoded.role };
   } catch {
     return null;
@@ -46,10 +30,9 @@ export async function verifyJWT(token: string, secret: string): Promise<{ id: nu
 // ============================================================
 export async function verifyToken(secret: string, token: string, env: Env): Promise<Variables | false> {
   try {
-    const decoded = await verify(token, secret) as any;
+    const decoded = await verify(token, secret, 'HS256') as any;
     // Check token blacklist
-    const kv = (globalThis as any).__KV as KVNamespace | undefined;
-    if (kv && await kv.get(`blacklist:${token}`)) {
+    if (env.KV && await env.KV.get(`blacklist:${token}`)) {
       return false;
     }
     return {

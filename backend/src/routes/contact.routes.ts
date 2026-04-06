@@ -1,7 +1,4 @@
-import { Context } from "hono";
-import type { Env, Variables } from "../app";
-
-type Ctx = { Bindings: Env; Variables: Variables };
+import type { Ctx } from "../app";
 
 function sanitize(str: string | undefined): string {
   if (!str) return "";
@@ -35,7 +32,7 @@ export async function submitContact(c: Ctx) {
       return c.json({ success: false, message: "Invalid email format" }, 400);
     }
 
-    c.env.DB
+    await c.env.DB
       .prepare(
         `INSERT INTO contact_messages (name, email, phone, subject, message, service_interest, status)
          VALUES (?, ?, ?, ?, ?, ?, ?)`
@@ -64,11 +61,12 @@ export async function listContactMessages(c: Ctx) {
     const page = Math.max(1, parseInt(c.req.query("page") || "1"));
     const limit = Math.min(50, Math.max(1, parseInt(c.req.query("limit") || "10")));
 
-    const { total } = c.env.DB
+    const countResult = await c.env.DB
       .prepare("SELECT COUNT(*) as total FROM contact_messages")
-      .first<{ total: number }>()!;
+      .first<{ total: number }>();
+    const total = countResult?.total || 0;
 
-    const results = c.env.DB
+    const results = await c.env.DB
       .prepare("SELECT * FROM contact_messages ORDER BY created_at DESC LIMIT ? OFFSET ?")
       .bind(limit, (page - 1) * limit)
       .all();
@@ -80,7 +78,7 @@ export async function listContactMessages(c: Ctx) {
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Unknown error";
-    return c.json({ success: false, message: `Failed to fetch contact messages: ${msg}` }, 500);
+    return c.json({ success: false, message: `Failed to fetch contact messages: ${msg || "Unknown error"}` }, 500);
   }
 }
 
@@ -92,18 +90,18 @@ export async function updateContactMessage(c: Ctx) {
 
     const body = await c.req.json<{ status?: string; notes?: string }>();
 
-    const existing = c.env.DB.prepare("SELECT id FROM contact_messages WHERE id = ?").bind(id).first();
+    const existing = await c.env.DB.prepare("SELECT id FROM contact_messages WHERE id = ?").bind(id).first();
     if (!existing) return c.json({ success: false, message: "Message not found" }, 404);
 
     if (body.status) {
-      c.env.DB
+      await c.env.DB
         .prepare("UPDATE contact_messages SET status = ?, updated_at = datetime('now') WHERE id = ?")
         .bind(sanitize(body.status), id)
         .run();
     }
 
     if (body.notes !== undefined) {
-      c.env.DB
+      await c.env.DB
         .prepare("UPDATE contact_messages SET notes = ?, updated_at = datetime('now') WHERE id = ?")
         .bind(sanitize(body.notes), id)
         .run();

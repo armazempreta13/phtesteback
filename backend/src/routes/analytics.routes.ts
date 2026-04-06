@@ -1,7 +1,4 @@
-import { Context } from "hono";
-import type { Env, Variables } from "../app";
-
-type Ctx = { Bindings: Env; Variables: Variables };
+import type { Ctx } from "../app";
 
 const VALID_TYPES = ["page_view", "click", "conversion", "scroll"] as const;
 
@@ -31,7 +28,7 @@ export async function trackAnalytics(c: Ctx) {
       return c.json({ success: false, message: "Path exceeds maximum length of 500 characters" }, 400);
     }
 
-    c.env.DB
+    await c.env.DB
       .prepare(
         "INSERT INTO site_analytics (type, path, user_agent, referrer) VALUES (?, ?, ?, ?)"
       )

@@ -1,10 +1,9 @@
-import { Context } from 'hono';
-import type { Env } from '../index';
+import type { Ctx } from '../app';
 
 // ============================================================
 // GET CLIENT PROJECTS — filtered by client_email
 // ============================================================
-export async function getClientProjects(c: Context<{ Bindings: Env; Variables: { userId: number; userRole: string; userEmail: string } }>) {
+export async function getClientProjects(c: Ctx) {
   try {
     const db = c.env.DB;
     const userEmail = c.get('userEmail');
@@ -23,7 +22,7 @@ export async function getClientProjects(c: Context<{ Bindings: Env; Variables: {
 // ============================================================
 // GET CLIENT PROJECT — ownership enforced
 // ============================================================
-export async function getClientProject(c: Context<{ Bindings: Env; Variables: { userId: number; userRole: string; userEmail: string } }>) {
+export async function getClientProject(c: Ctx) {
   try {
     const db = c.env.DB;
     const id = Number(c.req.param('id'));
@@ -47,7 +46,7 @@ export async function getClientProject(c: Context<{ Bindings: Env; Variables: { 
 // ============================================================
 // GET CLIENT MESSAGES — ownership enforced
 // ============================================================
-export async function getClientMessages(c: Context<{ Bindings: Env; Variables: { userId: number; userRole: string; userEmail: string } }>) {
+export async function getClientMessages(c: Ctx) {
   try {
     const db = c.env.DB;
     const id = Number(c.req.param('id'));
@@ -81,7 +80,7 @@ export async function getClientMessages(c: Context<{ Bindings: Env; Variables: {
 // ============================================================
 // SEND CLIENT MESSAGE — ownership enforced
 // ============================================================
-export async function sendClientMessage(c: Context<{ Bindings: Env; Variables: { userId: number; userRole: string; userEmail: string } }>) {
+export async function sendClientMessage(c: Ctx) {
   try {
     const db = c.env.DB;
     const id = Number(c.req.param('id'));

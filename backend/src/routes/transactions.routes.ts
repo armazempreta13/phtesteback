@@ -1,7 +1,4 @@
-import { Context } from "hono";
-import type { Env, Variables } from "../app";
-
-type Ctx = { Bindings: Env; Variables: Variables };
+import type { Ctx } from "../app";
 
 // ---- GET /transactions ----
 export async function listTransactions(c: Ctx) {
@@ -15,21 +12,21 @@ export async function listTransactions(c: Ctx) {
     let params: (string | number)[];
 
     if (role === "admin") {
-      const countResult = c.env.DB.prepare("SELECT COUNT(*) as total FROM transactions").first<{ total: number }>()!;
-      const total = countResult.total;
-      const results = c.env.DB
+      const countResult = await c.env.DB.prepare("SELECT COUNT(*) as total FROM transactions").first<{ total: number }>();
+      const total = countResult?.total || 0;
+      const results = await c.env.DB
         .prepare("SELECT * FROM transactions ORDER BY created_at DESC LIMIT ? OFFSET ?")
         .bind(limit, (page - 1) * limit)
         .all();
 
       return c.json({ success: true, data: results.results, meta: { page, limit, total } });
     } else {
-      const countResult = c.env.DB
+      const countResult = await c.env.DB
         .prepare("SELECT COUNT(*) as total FROM transactions WHERE user_id = ?")
         .bind(userId)
-        .first<{ total: number }>()!;
-      const total = countResult.total;
-      const results = c.env.DB
+        .first<{ total: number }>();
+      const total = countResult?.total || 0;
+      const results = await c.env.DB
         .prepare("SELECT * FROM transactions WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?")
         .bind(userId, limit, (page - 1) * limit)
         .all();
@@ -38,14 +35,14 @@ export async function listTransactions(c: Ctx) {
     }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Unknown error";
-    return c.json({ success: false, message: `Failed to fetch transactions: ${msg}` }, 500);
+    return c.json({ success: false, message: `Failed to fetch transactions: ${msg || "Unknown error"}` }, 500);
   }
 }
 
 // ---- GET /transactions/:id ----
 export async function getTransaction(c: Ctx) {
   try {
-    const id = parseInt(c.req.param("id"));
+    const id = parseInt(c.req.param("id") || "0");
     if (isNaN(id)) return c.json({ success: false, message: "Invalid transaction ID" }, 400);
 
     const role = c.get("userRole");
@@ -53,9 +50,9 @@ export async function getTransaction(c: Ctx) {
 
     let tx;
     if (role === "admin") {
-      tx = c.env.DB.prepare("SELECT * FROM transactions WHERE id = ?").bind(id).first();
+      tx = await c.env.DB.prepare("SELECT * FROM transactions WHERE id = ?").bind(id).first();
     } else {
-      tx = c.env.DB.prepare("SELECT * FROM transactions WHERE id = ? AND user_id = ?").bind(id, userId).first();
+      tx = await c.env.DB.prepare("SELECT * FROM transactions WHERE id = ? AND user_id = ?").bind(id, userId).first();
     }
 
     if (!tx) return c.json({ success: false, message: "Transaction not found" }, 404);
@@ -63,7 +60,7 @@ export async function getTransaction(c: Ctx) {
     return c.json({ success: true, data: tx });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Unknown error";
-    return c.json({ success: false, message: `Failed to fetch transaction: ${msg}` }, 500);
+    return c.json({ success: false, message: `Failed to fetch transaction: ${msg || "Unknown error"}` }, 500);
   }
 }
 
@@ -94,7 +91,7 @@ export async function createTransaction(c: Ctx) {
     const userId = c.get("userId");
     const pixCode = generatePixCode(body.amount, body.description || "");
 
-    const result = c.env.DB
+    const result = await c.env.DB
       .prepare(
         "INSERT INTO transactions (user_id, amount, project_id, type, description, pix_code, status) VALUES (?, ?, ?, ?, ?, ?, ?)"
       )
@@ -119,7 +116,7 @@ export async function createTransaction(c: Ctx) {
     );
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Unknown error";
-    return c.json({ success: false, message: `Failed to create transaction: ${msg}` }, 500);
+    return c.json({ success: false, message: `Failed to create transaction: ${msg || "Unknown error"}` }, 500);
   }
 }
 
@@ -133,7 +130,7 @@ export async function webhookTransaction(c: Ctx) {
       return c.json({ success: false, message: "Invalid webhook signature" }, 401);
     }
 
-    const id = parseInt(c.req.param("id"));
+    const id = parseInt(c.req.param("id") || "0");
     if (isNaN(id)) return c.json({ success: false, message: "Invalid transaction ID" }, 400);
 
     const body = await c.req.json<{
@@ -142,10 +139,10 @@ export async function webhookTransaction(c: Ctx) {
     }>();
 
     // Check transaction exists
-    const tx = c.env.DB.prepare("SELECT id FROM transactions WHERE id = ?").bind(id).first();
+    const tx = await c.env.DB.prepare("SELECT id FROM transactions WHERE id = ?").bind(id).first();
     if (!tx) return c.json({ success: false, message: "Transaction not found" }, 404);
 
-    c.env.DB
+    await c.env.DB
       .prepare("UPDATE transactions SET status = ?, payment_id = ?, updated_at = datetime('now') WHERE id = ?")
       .bind(body.status ?? "unknown", body.payment_id ?? null, id)
       .run();
@@ -153,6 +150,6 @@ export async function webhookTransaction(c: Ctx) {
     return c.json({ success: true, message: "Transaction status updated" });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Unknown error";
-    return c.json({ success: false, message: `Failed to process webhook: ${msg}` }, 500);
+    return c.json({ success: false, message: `Failed to process webhook: ${msg || "Unknown error"}` }, 500);
   }
 }

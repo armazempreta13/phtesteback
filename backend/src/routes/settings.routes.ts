@@ -1,16 +1,16 @@
-import { Context } from 'hono';
-import type { Env } from '../index';
+import type { Ctx } from '../app';
 
 // ============================================================
 // GET ALL SETTINGS — admin only
 // ============================================================
-export async function getSettings(c: Context<{ Bindings: Env; Variables: { userId: number; userRole: string; userEmail: string } }>) {
+export async function getSettings(c: Ctx) {
   try {
     const db = c.env.DB;
     const result = await db.prepare('SELECT * FROM site_settings ORDER BY category, key').all();
 
     const settings: Record<string, any> = {};
-    for (const row of (result.results || [])) {
+    const rows = (result.results || []) as any[];
+    for (const row of rows) {
       try {
         settings[row.key] = typeof row.value === 'string' ? JSON.parse(row.value) : row.value;
       } catch {
@@ -28,7 +28,7 @@ export async function getSettings(c: Context<{ Bindings: Env; Variables: { userI
 // ============================================================
 // UPDATE SETTINGS — admin only
 // ============================================================
-export async function updateSettings(c: Context<{ Bindings: Env; Variables: { userId: number; userRole: string; userEmail: string } }>) {
+export async function updateSettings(c: Ctx) {
   try {
     const db = c.env.DB;
     const body = await c.req.json();

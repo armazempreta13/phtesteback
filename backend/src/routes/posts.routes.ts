@@ -1,7 +1,4 @@
-import { Context } from "hono";
-import type { Env, Variables } from "../app";
-
-type Ctx = { Bindings: Env; Variables: Variables };
+import type { Ctx } from "../app";
 
 // ---- GET /posts ----
 export async function listPosts(c: Ctx) {
@@ -13,12 +10,13 @@ export async function listPosts(c: Ctx) {
     const countSql = isAdmin
       ? "SELECT COUNT(*) as total FROM posts"
       : "SELECT COUNT(*) as total FROM posts WHERE published = 1";
-    const { total } = c.env.DB.prepare(countSql).first<{ total: number }>()!;
+    const countResult = await c.env.DB.prepare(countSql).first<{ total: number }>();
+    const total = countResult?.total || 0;
 
     const dataSql = isAdmin
       ? "SELECT * FROM posts ORDER BY created_at DESC LIMIT ? OFFSET ?"
       : "SELECT * FROM posts WHERE published = 1 ORDER BY created_at DESC LIMIT ? OFFSET ?";
-    const data = c.env.DB.prepare(dataSql).bind(limit, (page - 1) * limit).all();
+    const data = await c.env.DB.prepare(dataSql).bind(limit, (page - 1) * limit).all();
 
     return c.json({
       success: true,
@@ -27,7 +25,7 @@ export async function listPosts(c: Ctx) {
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Unknown error";
-    return c.json({ success: false, message: `Failed to fetch posts: ${msg}` }, 500);
+    return c.json({ success: false, message: `Failed to fetch posts: ${msg || "Unknown error"}` }, 500);
   }
 }
 
@@ -41,14 +39,14 @@ export async function getPost(c: Ctx) {
     const sql = isAdmin
       ? "SELECT * FROM posts WHERE id = ?"
       : "SELECT * FROM posts WHERE id = ? AND published = 1";
-    const post = c.env.DB.prepare(sql).bind(id).first();
+    const post = await c.env.DB.prepare(sql).bind(id).first();
 
     if (!post) return c.json({ success: false, message: "Post not found" }, 404);
 
     return c.json({ success: true, data: post });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Unknown error";
-    return c.json({ success: false, message: `Failed to fetch post: ${msg}` }, 500);
+    return c.json({ success: false, message: `Failed to fetch post: ${msg || "Unknown error"}` }, 500);
   }
 }
 
@@ -74,10 +72,10 @@ export async function createPost(c: Ctx) {
     }
 
     // Validate slug uniqueness
-    const existing = c.env.DB.prepare("SELECT id FROM posts WHERE slug = ?").bind(body.slug).first();
+    const existing = await c.env.DB.prepare("SELECT id FROM posts WHERE slug = ?").bind(body.slug).first();
     if (existing) return c.json({ success: false, message: "Slug already exists" }, 409);
 
-    const result = c.env.DB
+    const result = await c.env.DB
       .prepare(
         "INSERT INTO posts (title, slug, content, excerpt, cover_image, tags, published) VALUES (?, ?, ?, ?, ?, ?, ?)"
       )
@@ -95,7 +93,7 @@ export async function createPost(c: Ctx) {
     return c.json({ success: true, data: { id: result.meta.last_row_id }, message: "Post created" }, 201);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Unknown error";
-    return c.json({ success: false, message: `Failed to create post: ${msg}` }, 500);
+    return c.json({ success: false, message: `Failed to create post: ${msg || "Unknown error"}` }, 500);
   }
 }
 
@@ -117,28 +115,28 @@ export async function updatePost(c: Ctx) {
 
     // Check slug uniqueness if changing
     if (body.slug) {
-      const existing = c.env.DB
+      const existing = await c.env.DB
         .prepare("SELECT id FROM posts WHERE slug = ? AND id != ?")
         .bind(body.slug, id)
         .first();
       if (existing) return c.json({ success: false, message: "Slug already exists" }, 409);
     }
 
-    const current = c.env.DB.prepare("SELECT * FROM posts WHERE id = ?").bind(id).first();
+    const current = await c.env.DB.prepare("SELECT * FROM posts WHERE id = ?").bind(id).first<any>();
     if (!current) return c.json({ success: false, message: "Post not found" }, 404);
 
-    c.env.DB
+    await c.env.DB
       .prepare(
         "UPDATE posts SET title = ?, slug = ?, content = ?, excerpt = ?, cover_image = ?, tags = ?, published = ? WHERE id = ?"
       )
       .bind(
-        sanitize(body.title ?? (current as any).title),
-        body.slug ?? (current as any).slug,
-        sanitize(body.content ?? (current as any).content),
-        sanitize(body.excerpt ?? (current as any).excerpt),
-        body.cover_image ?? (current as any).cover_image,
-        body.tags ?? (current as any).tags,
-        body.published ?? (current as any).published,
+        sanitize(body.title || current.title),
+        body.slug || current.slug,
+        sanitize(body.content || current.content),
+        sanitize(body.excerpt || current.excerpt),
+        body.cover_image || current.cover_image,
+        body.tags || current.tags,
+        body.published ?? current.published,
         id
       )
       .run();
@@ -146,7 +144,7 @@ export async function updatePost(c: Ctx) {
     return c.json({ success: true, message: "Post updated" });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Unknown error";
-    return c.json({ success: false, message: `Failed to update post: ${msg}` }, 500);
+    return c.json({ success: false, message: `Failed to update post: ${msg || "Unknown error"}` }, 500);
   }
 }
 
@@ -156,10 +154,10 @@ export async function deletePost(c: Ctx) {
     const id = parseInt(c.req.param("id"));
     if (isNaN(id)) return c.json({ success: false, message: "Invalid post ID" }, 400);
 
-    const existing = c.env.DB.prepare("SELECT id FROM posts WHERE id = ?").bind(id).first();
+    const existing = await c.env.DB.prepare("SELECT id FROM posts WHERE id = ?").bind(id).first();
     if (!existing) return c.json({ success: false, message: "Post not found" }, 404);
 
-    c.env.DB.prepare("DELETE FROM posts WHERE id = ?").bind(id).run();
+    await c.env.DB.prepare("DELETE FROM posts WHERE id = ?").bind(id).run();
 
     return c.json({ success: true, message: "Post deleted" });
   } catch (err: unknown) {

@@ -1,10 +1,10 @@
 import { Context } from 'hono';
-import type { Env } from '../index';
+import type { Ctx } from '../app';
 
 // ============================================================
 // AI CHAT — requires auth + rate limited
 // ============================================================
-export async function aiChat(c: Context<{ Bindings: Env; Variables: { userId: number; userRole: string; userEmail: string } }>) {
+export async function aiChat(c: Ctx) {
   try {
     const body = await c.req.json();
     const { messages, systemPrompt } = body;
@@ -56,16 +56,16 @@ export async function aiChat(c: Context<{ Bindings: Env; Variables: { userId: nu
     const reply = data.choices?.[0]?.message?.content || 'Sem resposta.';
 
     return c.json({ success: true, data: { message: reply } });
-  } catch (err) {
-    console.error('AI chat error:', err);
-    return c.json({ success: false, message: 'Erro na comunicacao com IA' }, 500);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Unknown error";
+    return c.json({ success: false, message: `Erro na comunicacao com IA: ${msg || "Unknown error"}` }, 500);
   }
 }
 
 // ============================================================
 // AI CHAT STREAM — requires auth
 // ============================================================
-export async function aiChatStream(c: Context<{ Bindings: Env; Variables: { userId: number; userRole: string; userEmail: string } }>) {
+export async function aiChatStream(c: Ctx) {
   try {
     const body = await c.req.json();
     const { messages, systemPrompt } = body;
@@ -118,8 +118,8 @@ export async function aiChatStream(c: Context<{ Bindings: Env; Variables: { user
         'Connection': 'keep-alive',
       },
     });
-  } catch (err) {
-    console.error('AI chat stream error:', err);
-    return c.json({ success: false, message: 'Erro na comunicacao com IA' }, 500);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Unknown error";
+    return c.json({ success: false, message: `Erro na comunicacao com IA (stream): ${msg || "Unknown error"}` }, 500);
   }
 }

@@ -19,32 +19,12 @@ import { getClientProjects, getClientProject, getClientMessages, sendClientMessa
 import { getSettings, updateSettings } from './routes/settings.routes';
 import { trackAnalytics } from './routes/analytics.routes';
 import { aiChat, aiChatStream } from './routes/ai.routes';
-import { authMiddleware, requireAdmin, setAuthContext } from './middleware';
+import { authMiddleware, requireAdmin, setAuthContext, verifyToken as middlewareVerifyToken } from './middleware';
+import { Env, Variables } from './app';
 
 const app = new Hono<{
-  Bindings: {
-    DB: D1Database;
-    KV: KVNamespace;
-    UPLOADS: R2Bucket;
-    JWT_SECRET: string;
-    AI_API_KEY: string;
-    AI_MODEL: string;
-    CORS_ORIGIN: string;
-    SMTP_HOST?: string;
-    SMTP_PORT?: number;
-    SMTP_SECURE?: string;
-    SMTP_USER?: string;
-    SMTP_PASS?: string;
-    ADMIN_EMAIL: string;
-    ADMIN_PASSWORD: string;
-    WEBHOOK_SECRET: string;
-    NODE_ENV: string;
-  };
-  Variables: {
-    userId: number;
-    userRole: string;
-    userEmail: string;
-  };
+  Bindings: Env;
+  Variables: Variables;
 }>();
 
 // ============================================================
@@ -56,8 +36,9 @@ app.use('*', secureHeaders());
 // CORS
 // ============================================================
 app.use('/api/*', cors({
-  origin: (origin) => {
-    const allowed = (typeof origin === 'string') ? [origin] : ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:4000'];
+  origin: (origin, c) => {
+    const dynamicAllowed = c.env.CORS_ORIGIN ? c.env.CORS_ORIGIN.split(',') : ['https://phstatic.com.br'];
+    const allowed = [...dynamicAllowed];
     return origin && allowed.includes(origin) ? origin : allowed[0];
   },
   credentials: true,
@@ -101,7 +82,8 @@ app.use('/api/*', async (c, next) => {
 // ============================================================
 app.use('/api/*', async (c, next) => {
   const info = getConnInfo(c);
-  console.log(`[${new Date().toISOString()}] ${c.req.method} ${c.req.url}`, { ip: info.address, userAgent: c.req.header('user-agent') });
+  const ip = info.remote.address || 'unknown';
+  console.log(`[${new Date().toISOString()}] ${c.req.method} ${c.req.url}`, { ip, userAgent: c.req.header('user-agent') });
   await next();
 });
 
@@ -129,7 +111,8 @@ app.post('/api/auth/register', register);
 app.post('/api/auth/login', login);
 app.post('/api/auth/verify', bearerAuth({
   verifyToken: async (token, c) => {
-    return await verifyToken(c.env.JWT_SECRET, token, c.env);
+    const res = await middlewareVerifyToken(c.env.JWT_SECRET, token, c.env);
+    return res !== false;
   },
 }), verifyToken);
 

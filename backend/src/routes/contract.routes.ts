@@ -1,10 +1,9 @@
-import { Context } from 'hono';
-import type { Env } from '../index';
+import type { Ctx } from '../app';
 
 // ============================================================
 // GET CONTRACT — ownership enforced (admin sees all)
 // ============================================================
-export async function getContract(c: Context<{ Bindings: Env; Variables: { userId: number; userRole: string; userEmail: string } }>) {
+export async function getContract(c: Ctx) {
   try {
     const db = c.env.DB;
     const projectId = Number(c.req.param('project_id'));
@@ -43,7 +42,7 @@ export async function getContract(c: Context<{ Bindings: Env; Variables: { userI
 // ============================================================
 // GENERATE CONTRACT — admin only
 // ============================================================
-export async function generateContract(c: Context<{ Bindings: Env; Variables: { userId: number; userRole: string; userEmail: string } }>) {
+export async function generateContract(c: Ctx) {
   try {
     const db = c.env.DB;
     const body = await c.req.json();
@@ -84,7 +83,7 @@ export async function generateContract(c: Context<{ Bindings: Env; Variables: { 
 // ============================================================
 // UPDATE CONTRACT — admin only
 // ============================================================
-export async function updateContract(c: Context<{ Bindings: Env; Variables: { userId: number; userRole: string; userEmail: string } }>) {
+export async function updateContract(c: Ctx) {
   try {
     const db = c.env.DB;
     const projectId = Number(c.req.param('project_id'));
@@ -111,7 +110,7 @@ export async function updateContract(c: Context<{ Bindings: Env; Variables: { us
 
     // Only allow specific fields to be updated
     const allowedFields = ['status', 'sentAt', 'signedAt', 'adminSignature', 'clientSignature', 'terms'];
-    const updatePayload = { ...contractData };
+    const updatePayload: Record<string, any> = { ...contractData };
     for (const field of allowedFields) {
       if (body.contract[field] !== undefined) {
         updatePayload[field] = body.contract[field];
@@ -132,7 +131,7 @@ export async function updateContract(c: Context<{ Bindings: Env; Variables: { us
 // ============================================================
 // REVOKE CONTRACT — admin only
 // ============================================================
-export async function revokeContract(c: Context<{ Bindings: Env; Variables: { userId: number; userRole: string; userEmail: string } }>) {
+export async function revokeContract(c: Ctx) {
   try {
     const db = c.env.DB;
     const projectId = Number(c.req.param('project_id'));

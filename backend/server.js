@@ -191,7 +191,7 @@ async function bootstrap() {
     app.listen(config.port, () => {
       logger.info(`Server running on port ${config.port}`);
       logger.info(`Environment: ${config.nodeEnv}`);
-      logger.info(`API docs: http://localhost:${config.port}/api/health`);
+      logger.info(`API docs: https://phstatic.com.br/api/health`);
     });
   } catch (err) {
     logger.error('Failed to start server:', err.message, err.stack);

@@ -1,10 +1,9 @@
-import { Context } from 'hono';
-import type { Env } from '../index';
+import type { Ctx } from '../app';
 
 // ============================================================
 // GET ALL PROJECTS — admin sees all, client sees own
 // ============================================================
-export async function getProjects(c: Context<{ Bindings: Env; Variables: { userId: number; userRole: string; userEmail: string } }>) {
+export async function getProjects(c: Ctx) {
   try {
     const db = c.env.DB;
     const userRole = c.get('userRole');
@@ -31,7 +30,7 @@ export async function getProjects(c: Context<{ Bindings: Env; Variables: { userI
 // ============================================================
 // GET SINGLE PROJECT — ownership enforced
 // ============================================================
-export async function getProject(c: Context<{ Bindings: Env; Variables: { userId: number; userRole: string; userEmail: string } }>) {
+export async function getProject(c: Ctx) {
   try {
     const db = c.env.DB;
     const id = Number(c.req.param('id'));
@@ -61,7 +60,7 @@ export async function getProject(c: Context<{ Bindings: Env; Variables: { userId
 // ============================================================
 // CREATE PROJECT — admin only
 // ============================================================
-export async function createProject(c: Context<{ Bindings: Env; Variables: { userId: number; userRole: string; userEmail: string } }>) {
+export async function createProject(c: Ctx) {
   try {
     const db = c.env.DB;
     const body = await c.req.json();
@@ -102,7 +101,7 @@ export async function createProject(c: Context<{ Bindings: Env; Variables: { use
 // ============================================================
 // UPDATE PROJECT — admin only, fields validated
 // ============================================================
-export async function updateProject(c: Context<{ Bindings: Env; Variables: { userId: number; userRole: string; userEmail: string } }>) {
+export async function updateProject(c: Ctx) {
   try {
     const db = c.env.DB;
     const id = Number(c.req.param('id'));
@@ -155,7 +154,7 @@ export async function updateProject(c: Context<{ Bindings: Env; Variables: { use
 // ============================================================
 // DELETE PROJECT — admin only
 // ============================================================
-export async function deleteProject(c: Context<{ Bindings: Env; Variables: { userId: number; userRole: string; userEmail: string } }>) {
+export async function deleteProject(c: Ctx) {
   try {
     const db = c.env.DB;
     const id = Number(c.req.param('id'));

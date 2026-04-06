@@ -1,29 +1,26 @@
-import { Context } from "hono";
-import type { Env, Variables } from "../app";
-
-type Ctx = { Bindings: Env; Variables: Variables };
+import type { Ctx } from "../app";
 
 // ---- GET /admin/stats ----
 export async function getAdminStats(c: Ctx) {
   try {
-    const users = c.env.DB.prepare("SELECT COUNT(*) as total FROM users").first<{ total: number }>()!;
-    const projects = c.env.DB.prepare("SELECT COUNT(*) as total FROM projects").first<{ total: number }>()!;
-    const transactions = c.env.DB.prepare("SELECT COUNT(*) as total FROM transactions").first<{ total: number }>()!;
-    const posts = c.env.DB.prepare("SELECT COUNT(*) as total FROM posts").first<{ total: number }>()!;
-    const portfolioItems = c.env.DB.prepare("SELECT COUNT(*) as total FROM portfolio").first<{ total: number }>()!;
-    const briefings = c.env.DB.prepare("SELECT COUNT(*) as total FROM briefings").first<{ total: number }>()!;
-    const contactMessages = c.env.DB.prepare("SELECT COUNT(*) as total FROM contact_messages").first<{ total: number }>()!;
+    const users = await c.env.DB.prepare("SELECT COUNT(*) as total FROM users").first<{ total: number }>()!;
+    const projects = await c.env.DB.prepare("SELECT COUNT(*) as total FROM projects").first<{ total: number }>()!;
+    const transactions = await c.env.DB.prepare("SELECT COUNT(*) as total FROM transactions").first<{ total: number }>()!;
+    const posts = await c.env.DB.prepare("SELECT COUNT(*) as total FROM posts").first<{ total: number }>()!;
+    const portfolioItems = await c.env.DB.prepare("SELECT COUNT(*) as total FROM portfolio").first<{ total: number }>()!;
+    const briefings = await c.env.DB.prepare("SELECT COUNT(*) as total FROM briefings").first<{ total: number }>()!;
+    const contactMessages = await c.env.DB.prepare("SELECT COUNT(*) as total FROM contact_messages").first<{ total: number }>()!;
 
     return c.json({
       success: true,
       data: {
-        users: users.total,
-        projects: projects.total,
-        transactions: transactions.total,
-        posts: posts.total,
-        portfolio_items: portfolioItems.total,
-        briefings: briefings.total,
-        contact_messages: contactMessages.total,
+        users: users?.total || 0,
+        projects: projects?.total || 0,
+        transactions: transactions?.total || 0,
+        posts: posts?.total || 0,
+        portfolio_items: portfolioItems?.total || 0,
+        briefings: briefings?.total || 0,
+        contact_messages: contactMessages?.total || 0,
       },
     });
   } catch (err: unknown) {
@@ -41,7 +38,7 @@ export async function getAnalytics(c: Ctx) {
     }
     const days = Math.min(daysParam, 365);
 
-    const data = c.env.DB
+    const data = await c.env.DB
       .prepare(`
         SELECT * FROM site_analytics
         WHERE created_at >= datetime('now', ?)
@@ -50,7 +47,7 @@ export async function getAnalytics(c: Ctx) {
       .bind(`-${days} days`)
       .all();
 
-    const summary = c.env.DB
+    const summary = await c.env.DB
       .prepare(`
         SELECT
           COUNT(*) as total_events,

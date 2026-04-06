@@ -11,7 +11,7 @@ module.exports = {
     path: process.env.DB_PATH || './data/phdev.db',
   },
   cors: {
-    origin: (process.env.CORS_ORIGIN || 'http://localhost:5173').split(','),
+    origin: (process.env.CORS_ORIGIN || 'https://phstatic.com.br').split(','),
   },
   rateLimit: {
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 1 * 60 * 1000,

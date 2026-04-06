@@ -1,10 +1,9 @@
-import { Context } from 'hono';
-import type { Env } from '../index';
+import type { Ctx } from '../app';
 
 // ============================================================
 // GET NOTIFICATIONS — user's own only
 // ============================================================
-export async function getNotifications(c: Context<{ Bindings: Env; Variables: { userId: number; userRole: string; userEmail: string } }>) {
+export async function getNotifications(c: Ctx) {
   try {
     const db = c.env.DB;
     const userId = c.get('userId');
@@ -52,7 +51,7 @@ export async function getNotifications(c: Context<{ Bindings: Env; Variables: { 
 // ============================================================
 // CREATE NOTIFICATION — admin only (validated in routes)
 // ============================================================
-export async function createNotification(c: Context<{ Bindings: Env; Variables: { userId: number; userRole: string; userEmail: string } }>) {
+export async function createNotification(c: Ctx) {
   try {
     const db = c.env.DB;
     const body = await c.req.json();
@@ -85,7 +84,7 @@ export async function createNotification(c: Context<{ Bindings: Env; Variables: 
 // ============================================================
 // MARK AS READ — ownership enforced
 // ============================================================
-export async function markAsRead(c: Context<{ Bindings: Env; Variables: { userId: number; userRole: string; userEmail: string } }>) {
+export async function markAsRead(c: Ctx) {
   try {
     const db = c.env.DB;
     const userId = c.get('userId');
@@ -109,7 +108,7 @@ export async function markAsRead(c: Context<{ Bindings: Env; Variables: { userId
 // ============================================================
 // MARK ALL AS READ — ownership enforced
 // ============================================================
-export async function markAllAsRead(c: Context<{ Bindings: Env; Variables: { userId: number; userRole: string; userEmail: string } }>) {
+export async function markAllAsRead(c: Ctx) {
   try {
     const db = c.env.DB;
     const userId = c.get('userId');

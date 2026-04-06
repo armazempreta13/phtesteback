@@ -1,6 +1,4 @@
-// ============================================================
-// Shared types for the PH.dev API (Cloudflare Workers / Hono)
-// ============================================================
+import { Context } from 'hono';
 
 export interface Env {
   DB: D1Database;
@@ -26,3 +24,5 @@ export interface Variables {
   userRole: string;
   userEmail: string;
 }
+
+export type Ctx = Context<{ Bindings: Env; Variables: Variables }>;

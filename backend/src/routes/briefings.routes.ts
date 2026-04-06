@@ -1,7 +1,4 @@
-import { Context } from "hono";
-import type { Env, Variables } from "../app";
-
-type Ctx = { Bindings: Env; Variables: Variables };
+import type { Ctx } from "../app";
 
 function sanitize(str: string | undefined): string {
   if (!str) return "";
@@ -40,7 +37,7 @@ export async function createBriefing(c: Ctx) {
 
     const features = body.features ? (typeof body.features === "string" ? body.features : JSON.stringify(body.features)) : null;
 
-    const result = c.env.DB
+    const result = await c.env.DB
       .prepare(
         `INSERT INTO briefings (name, email, phone, company, project_type, description, budget_range, deadline, features, status)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
@@ -62,7 +59,7 @@ export async function createBriefing(c: Ctx) {
     return c.json({ success: true, data: { id: result.meta.last_row_id }, message: "Briefing submitted" }, 201);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Unknown error";
-    return c.json({ success: false, message: `Failed to create briefing: ${msg}` }, 500);
+    return c.json({ success: false, message: `Failed to create briefing: ${msg || "Unknown error"}` }, 500);
   }
 }
 
@@ -88,8 +85,10 @@ export async function listBriefings(c: Ctx) {
       params = [userEmail, limit, (page - 1) * limit];
     }
 
-    const { total } = c.env.DB.prepare(countSql).bind(...params.slice(0, role === "admin" ? 0 : 1)).first<{ total: number }>()!;
-    const results = c.env.DB.prepare(sql).bind(...params).all();
+    const countResult = await c.env.DB.prepare(countSql).bind(...params.slice(0, role === "admin" ? 0 : 1)).first<{ total: number }>();
+    const total = countResult?.total || 0;
+
+    const results = await c.env.DB.prepare(sql).bind(...params).all();
 
     return c.json({
       success: true,
@@ -98,14 +97,14 @@ export async function listBriefings(c: Ctx) {
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Unknown error";
-    return c.json({ success: false, message: `Failed to fetch briefings: ${msg}` }, 500);
+    return c.json({ success: false, message: `Failed to fetch briefings: ${msg || "Unknown error"}` }, 500);
   }
 }
 
 // ---- GET /briefings/:id ----
 export async function getBriefing(c: Ctx) {
   try {
-    const id = parseInt(c.req.param("id"));
+    const id = parseInt(c.req.param("id") || "0");
     if (isNaN(id)) return c.json({ success: false, message: "Invalid briefing ID" }, 400);
 
     const role = c.get("userRole");
@@ -113,9 +112,9 @@ export async function getBriefing(c: Ctx) {
 
     let briefing;
     if (role === "admin") {
-      briefing = c.env.DB.prepare("SELECT * FROM briefings WHERE id = ?").bind(id).first();
+      briefing = await c.env.DB.prepare("SELECT * FROM briefings WHERE id = ?").bind(id).first();
     } else {
-      briefing = c.env.DB.prepare("SELECT * FROM briefings WHERE id = ? AND email = ?").bind(id, userEmail).first();
+      briefing = await c.env.DB.prepare("SELECT * FROM briefings WHERE id = ? AND email = ?").bind(id, userEmail).first();
     }
 
     if (!briefing) return c.json({ success: false, message: "Briefing not found" }, 404);
@@ -123,23 +122,23 @@ export async function getBriefing(c: Ctx) {
     return c.json({ success: true, data: briefing });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Unknown error";
-    return c.json({ success: false, message: `Failed to fetch briefing: ${msg}` }, 500);
+    return c.json({ success: false, message: `Failed to fetch briefing: ${msg || "Unknown error"}` }, 500);
   }
 }
 
 // ---- PUT /briefings/:id/status ----
 export async function updateBriefingStatus(c: Ctx) {
   try {
-    const id = parseInt(c.req.param("id"));
+    const id = parseInt(c.req.param("id") || "0");
     if (isNaN(id)) return c.json({ success: false, message: "Invalid briefing ID" }, 400);
 
     const body = await c.req.json<{ status: string }>();
     if (!body.status) return c.json({ success: false, message: "Status is required" }, 400);
 
-    const existing = c.env.DB.prepare("SELECT id FROM briefings WHERE id = ?").bind(id).first();
+    const existing = await c.env.DB.prepare("SELECT id FROM briefings WHERE id = ?").bind(id).first();
     if (!existing) return c.json({ success: false, message: "Briefing not found" }, 404);
 
-    c.env.DB
+    await c.env.DB
       .prepare("UPDATE briefings SET status = ?, updated_at = datetime('now') WHERE id = ?")
       .bind(sanitize(body.status), id)
       .run();
@@ -147,6 +146,6 @@ export async function updateBriefingStatus(c: Ctx) {
     return c.json({ success: true, message: "Briefing status updated" });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Unknown error";
-    return c.json({ success: false, message: `Failed to update briefing status: ${msg}` }, 500);
+    return c.json({ success: false, message: `Failed to update briefing status: ${msg || "Unknown error"}` }, 500);
   }
 }
