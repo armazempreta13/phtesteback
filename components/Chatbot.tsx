@@ -69,7 +69,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, onNavigate,
   useEffect(() => {
     if (isOpen && messages.length === 0) {
       initializeChat();
-      fetch(`http://localhost:4000/api/analytics/track`, {
+      fetch(`/api/analytics/track`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: 'chat_open', path: window.location.pathname, userAgent: navigator.userAgent }),

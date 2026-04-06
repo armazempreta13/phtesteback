@@ -7,7 +7,9 @@
     "directory": "dist",
     "not_found_handling": "single-page-application"
   },
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
   "d1_databases": [
     {
       "binding": "DB",
@@ -22,6 +24,6 @@
     }
   ],
   "build": {
-    "command": "npm install && cd backend && npm install"
+    "command": "npm install && npm run build"
   }
 }

@@ -10,7 +10,7 @@ export default defineConfig(({ mode }) => {
         host: '0.0.0.0',
         proxy: {
           '/api': {
-            target: env.VITE_API_URL || 'http://localhost:4000',
+            target: env.VITE_API_URL || 'https://phtesteback.philippeboechat1.workers.dev',
             changeOrigin: true,
           },
         },

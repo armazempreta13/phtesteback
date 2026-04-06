@@ -42,7 +42,7 @@ const ClientSettingsModal = ({ isOpen, onClose, userEmail, userName }: { isOpen:
     if (!currentPassInput) { setMessage({ type: 'error', text: 'Informe a senha atual.' }); return; }
     setIsLoading(true); setMessage(null);
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/auth/change-password`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || '/api'}/auth/change-password`, {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` },
         body: JSON.stringify({ currentPassword: currentPassInput, newPassword: newPass }),
       });

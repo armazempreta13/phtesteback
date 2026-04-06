@@ -3,7 +3,7 @@ import { MessageCircle, X, Send, Sparkles, Zap, RotateCcw, CheckCircle, AlertCir
 import { AnimatePresence, motion } from 'framer-motion';
 import { useMobile } from '../hooks/useMobile';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 interface Message {
   id: string;

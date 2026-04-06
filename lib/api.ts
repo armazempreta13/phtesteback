@@ -4,7 +4,7 @@ import { generatePixCode } from './pix';
 // Auto-detect API base: use relative URL in production (Cloudflare Pages proxy),
 // or explicit VITE_API_URL in development
 const isProd = import.meta.env.PROD;
-const API_BASE = isProd ? '/api' : (import.meta.env.VITE_API_URL || 'http://localhost:4000/api');
+const API_BASE = isProd ? '/api' : (import.meta.env.VITE_API_URL || '/api');
 
 // Token storage — uses httpOnly cookies from backend when available,
 // falls back to localStorage for dev compatibility
