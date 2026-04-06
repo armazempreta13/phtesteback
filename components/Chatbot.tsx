@@ -55,8 +55,6 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, onNavigate,
 
   // Unread replies badge
   const [unreadReplies, setUnreadReplies] = useState(0);
-  const [quickMessageInput, setQuickMessageInput] = useState('');
-  const quickMessageRef = useRef<HTMLTextAreaElement>(null);
 
   const { isVisible: isCookieVisible } = useCookieConsent();
   const isMobile = useMobile();
