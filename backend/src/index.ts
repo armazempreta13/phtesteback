@@ -13,7 +13,7 @@ import { listBriefings, getBriefing, createBriefing, updateBriefingStatus } from
 import { getNotifications, createNotification, markAsRead, markAllAsRead } from './routes/notifications.routes';
 import { listContactMessages, updateContactMessage, submitContact } from './routes/contact.routes';
 import { listTransactions, getTransaction, createTransaction, webhookTransaction } from './routes/transactions.routes';
-import { uploadFile, downloadFile, listUserUploads } from './routes/upload.routes';
+// import { uploadFile, downloadFile, listUserUploads } from './routes/upload.routes'; // disabled until R2 bucket created
 import { getContract, generateContract, updateContract, revokeContract } from './routes/contract.routes';
 import { getClientProjects, getClientProject, getClientMessages, sendClientMessage } from './routes/client.routes';
 import { getSettings, updateSettings } from './routes/settings.routes';
@@ -161,10 +161,10 @@ app.get('/api/transactions', setAuthContext, authMiddleware, listTransactions);
 app.get('/api/transactions/:id', setAuthContext, authMiddleware, getTransaction);
 app.post('/api/transactions', setAuthContext, authMiddleware, createTransaction);
 
-// Uploads
-app.post('/api/upload', setAuthContext, authMiddleware, uploadFile);
-app.get('/api/upload/:filename', setAuthContext, authMiddleware, downloadFile);
-app.get('/api/upload', setAuthContext, authMiddleware, listUserUploads);
+// Uploads (disabled until R2 bucket "phdev-uploads" is created on Cloudflare Dashboard)
+// app.post('/api/upload', setAuthContext, authMiddleware, uploadFile);
+// app.get('/api/upload/:filename', setAuthContext, authMiddleware, downloadFile);
+// app.get('/api/upload', setAuthContext, authMiddleware, listUserUploads);
 
 // Contract
 app.get('/api/contract/:project_id', setAuthContext, authMiddleware, getContract);

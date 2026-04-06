@@ -3,7 +3,6 @@ import { Context } from 'hono';
 export interface Env {
   DB: D1Database;
   KV: KVNamespace;
-  UPLOADS: R2Bucket;
   JWT_SECRET: string;
   AI_API_KEY: string;
   AI_MODEL: string;

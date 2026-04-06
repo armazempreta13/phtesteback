@@ -17,12 +17,6 @@
       "id": "fed3c38f264e49fb931197f359b5e003"
     }
   ],
-  "r2_buckets": [
-    {
-      "binding": "UPLOADS",
-      "bucket_name": "phdev-uploads"
-    }
-  ],
   "vars": {
     "NODE_ENV": "production",
     "CORS_ORIGIN": "https://phstatic.com.br",
