@@ -1,17 +1,19 @@
 
 import React from 'react';
-import { LayoutDashboard, Users, FileEdit, Briefcase, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, Users, FileEdit, Briefcase, Settings, LogOut, MessageSquare } from 'lucide-react';
 
 interface SidebarProps {
   activeTab: string;
   setActiveTab: (tab: any) => void;
+  unreadChat?: number;
   onLogout: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, onLogout }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, unreadChat = 0, onLogout }) => {
   const navItems = [
     { id: 'overview', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'leads', label: 'CRM & Projetos', icon: Users },
+    { id: 'chat', label: 'Mensagens', icon: MessageSquare },
     { id: 'cms', label: 'Blog & Conteúdo', icon: FileEdit },
     { id: 'portfolio', label: 'Portfólio', icon: Briefcase },
     { id: 'settings', label: 'Configurações', icon: Settings },
@@ -24,26 +26,29 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, onLog
           PH<span className="text-primary-600">.admin</span>
         </h1>
       </div>
-      
+
       <nav className="flex-1 p-4 space-y-1">
         {navItems.map((item) => (
           <button
             key={item.id}
             onClick={() => setActiveTab(item.id)}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${
-              activeTab === item.id 
-                ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400' 
+              activeTab === item.id
+                ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400'
                 : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
             }`}
           >
             <item.icon size={18} />
             {item.label}
+            {item.id === 'chat' && unreadChat > 0 && (
+              <span className="ml-auto bg-red-500 text-white text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full">{unreadChat}</span>
+            )}
           </button>
         ))}
       </nav>
 
       <div className="p-4 border-t border-gray-200 dark:border-gray-800">
-        <button 
+        <button
           onClick={onLogout}
           className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
         >

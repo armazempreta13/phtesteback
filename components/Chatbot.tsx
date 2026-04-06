@@ -382,6 +382,20 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, onNavigate,
     }
   };
 
+  const handleDirectContact = () => {
+    const message = `Olá! Vim pelo chat do site e gostaria de falar com um atendente.\n\nNome: ${budgetData.name || budgetData.inputValue || 'Não informado'}\n`;
+    if (budgetData.projectType) {
+      // Already has budget data — skip to confirm
+      addUserMessage('💬 Falar com atendente');
+      saveDirectMessage(message);
+      addBotMessage('Entendido! Sua mensagem foi enviada. O PH vai te responder em breve. 🙌');
+      return;
+    }
+    addUserMessage('💬 Falar com atendente');
+    saveDirectMessage(message);
+    addBotMessage('Entendido! Sua mensagem foi enviada. O PH vai te responder em breve. 🙌');
+  };
+
   const handleWhatsAppShortcut = () => {
       const text = `Olá! Prefiro pular o chat e falar diretamente com um atendente sobre meu projeto.`;
       const url = `https://wa.me/${CONTACT_CONFIG.WHATSAPP_NUMBER}?text=${encodeURIComponent(text)}`;
