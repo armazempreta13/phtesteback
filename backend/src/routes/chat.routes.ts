@@ -93,3 +93,54 @@ export async function replyToChatMessage(c: Ctx) {
     return c.json({ success: false, message: 'Failed to send reply' }, 500);
   }
 }
+
+// ============================================================
+// GET UNREAD COUNT — by email (for badge display)
+// ============================================================
+export async function getUnreadCount(c: Context) {
+  try {
+    const email = c.req.param('email');
+    if (!email) {
+      return c.json({ success: false, message: 'Email is required' }, 400);
+    }
+
+    // Count messages that have admin_reply but belong to this email
+    // A "new reply" means status = 'replied' and admin_reply is not null
+    const result = await c.env.DB.prepare(
+      `SELECT COUNT(*) as total FROM chat_messages
+       WHERE email = ? AND status = 'replied' AND admin_reply IS NOT NULL`
+    ).bind(email.toLowerCase()).first<{ total: number }>();
+
+    return c.json({
+      success: true,
+      data: { unread: result?.total || 0 },
+      email,
+    });
+  } catch (error: any) {
+    console.error('Error getting unread count:', error);
+    return c.json({ success: false, message: 'Failed to get unread count', count: 0 }, 200);
+  }
+}
+
+// ============================================================
+// GET CHAT STATISTICS — for admin dashboard
+// ============================================================
+export async function getChatStats(c: Ctx) {
+  try {
+    const stats = await c.env.DB.prepare(
+      `SELECT
+        COUNT(*) as total,
+        COUNT(CASE WHEN status = 'unread' THEN 1 END) as unread,
+        COUNT(CASE WHEN status = 'read' THEN 1 END) as read,
+        COUNT(CASE WHEN status = 'replied' THEN 1 END) as replied,
+        COUNT(CASE WHEN created_at >= date('now', '-7 days') THEN 1 END) as this_week,
+        COUNT(CASE WHEN created_at >= date('now', '-30 days') THEN 1 END) as this_month
+       FROM chat_messages`
+    ).first();
+
+    return c.json({ success: true, data: stats });
+  } catch (error: any) {
+    console.error('Error getting chat stats:', error);
+    return c.json({ success: false, message: 'Failed to get chat stats' }, 500);
+  }
+}

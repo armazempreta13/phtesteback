@@ -20,15 +20,13 @@ export const ChatInbox: React.FC = () => {
   const [selected, setSelected] = useState<ChatMessage | null>(null);
   const [replyText, setReplyText] = useState('');
   const [sending, setSending] = useState(false);
-  const [filter, setFilter] = useState<'all' | 'unread' | 'replied'>('all');
+  const [filter, setFilter] = useState<'all' | 'unread' | 'read' | 'replied'>('all');
   const [searchTerm, setSearchTerm] = useState('');
 
   const fetchMessages = async () => {
     try {
       setLoading(true);
-      const res = await api.request<{ success: boolean; messages: ChatMessage[]; total: number }>(
-        `/chat/messages${filter !== 'all' ? `?status=${filter}` : ''}`
-      );
+      const res = await api.chat.getAll(filter !== 'all' ? filter : undefined);
       setMessages(res.messages);
     } catch (e: any) {
       console.error('Failed to fetch chat messages:', e);
@@ -43,10 +41,7 @@ export const ChatInbox: React.FC = () => {
     if (!selected || !replyText.trim()) return;
     try {
       setSending(true);
-      const res = await api.request<{ success: boolean; message: ChatMessage }>(
-        `/chat/messages/${selected.id}/reply`,
-        { method: 'PUT', body: JSON.stringify({ admin_reply: replyText }) }
-      );
+      const res = await api.chat.reply(selected.id, replyText);
       setMessages(prev => prev.map(m => m.id === selected.id ? res.message : m));
       setSelected(res.message);
       setReplyText('');
@@ -81,10 +76,18 @@ export const ChatInbox: React.FC = () => {
     }
   };
 
-  const handleSelect = (msg: ChatMessage) => {
+  const handleSelect = async (msg: ChatMessage) => {
     setSelected(msg);
     if (msg.status === 'unread') {
       setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, status: 'read' as const } : m));
+      // Persist to backend
+      try {
+        await fetch(`/api/contact/${msg.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'read' }),
+        });
+      } catch { /* silent */ }
     }
   };
 
@@ -133,7 +136,7 @@ export const ChatInbox: React.FC = () => {
 
           {/* Filter Tabs */}
           <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
-            {(['all', 'unread', 'replied'] as const).map(f => (
+            {(['all', 'unread', 'read', 'replied'] as const).map(f => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
@@ -141,7 +144,7 @@ export const ChatInbox: React.FC = () => {
                   filter === f ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400'
                 }`}
               >
-                {f === 'all' ? 'Todas' : f === 'unread' ? 'N\xe3o lidas' : 'Respondidas'}
+                {f === 'all' ? 'Todas' : f === 'unread' ? 'N\xe3o lidas' : f === 'read' ? 'Lidas' : 'Respondidas'}
               </button>
             ))}
           </div>

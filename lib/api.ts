@@ -332,6 +332,29 @@ export const api = {
         body: JSON.stringify(data),
       });
     },
+    getAll: async (status?: string, page = 1, limit = 20) => {
+      const query = new URLSearchParams();
+      if (status) query.set('status', status);
+      query.set('page', String(page));
+      query.set('limit', String(limit));
+      return request<{ success: boolean; messages: any[]; total: number; page: number; limit: number }>(`/chat/messages?${query.toString()}`);
+    },
+    reply: async (id: number, reply: string) => {
+      return request<{ success: boolean; message: any }>(`/chat/messages/${id}/reply`, {
+        method: 'PUT',
+        body: JSON.stringify({ admin_reply: reply }),
+      });
+    },
+    getUnreadCount: async (email: string) => {
+      try {
+        const res = await fetch(`${API_BASE}/chat/unread/${encodeURIComponent(email)}`);
+        const data = await res.json();
+        return data?.data?.unread || 0;
+      } catch { return 0; }
+    },
+    getStats: async () => {
+      return request<{ success: boolean; data: any }>('/chat/stats');
+    },
   },
 
   // Keep existing PIX fallback for static payments

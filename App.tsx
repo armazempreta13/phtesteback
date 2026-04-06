@@ -29,7 +29,7 @@ import { ClientPortal } from './components/ClientPortal';
 import { AdminDashboard } from './components/AdminDashboard';
 import { ClientBriefingPage } from './components/ClientBriefingPage';
 
-const Chatbot = React.lazy(() => import('./components/Chatbot').then(module => ({ default: module.Chatbot })));
+const Chatbot = React.lazy(() => import('./components/ChatbotV3').then(module => ({ default: module.Chatbot })));
 const ZenithOnePage = React.lazy(() => import('./components/ZenithOnePage').then(module => ({ default: module.ZenithOnePage })));
 const AetherOnePage = React.lazy(() => import('./components/AetherOnePage').then(module => ({ default: module.AetherOnePage })));
 const Footer = React.lazy(() => import('./components/Footer').then(module => ({ default: module.Footer })));
