@@ -115,15 +115,17 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, onNavigate,
     return () => clearTimeout(showId);
   }, [isOpen]);
 
-  // --- Polling for admin replies ---
+  // --- Polling for admin replies (works with name + email, or just name) ---
   useEffect(() => {
     if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
     const runCheck = async () => {
       const email = budgetData.email || localStorage.getItem('chat_email');
-      if (email && budgetData.name) await checkAdminReplies(email);
+      const name = budgetData.name || localStorage.getItem('chat_name');
+      if (name || email) await checkAdminReplies(email, name);
     };
-    if (budgetData.name || localStorage.getItem('chat_name')) { runCheck(); pollingRef.current = setInterval(runCheck, 15000); }
+    if (budgetData.name || localStorage.getItem('chat_name')) { runCheck(); pollingRef.current = setInterval(runCheck, 10000); }
     return () => { if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; } };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [budgetData.name, budgetData.email]);
 
   // --- LocalStorage helpers ---

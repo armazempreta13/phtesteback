@@ -105,6 +105,36 @@ export async function replyToChatMessage(c: Ctx) {
 }
 
 // ============================================================
+// GET PUBLIC MESSAGES BY EMAIL — no admin auth required
+// Used by frontend to show admin replies to the user
+// ============================================================
+export async function getPublicMessages(c: Ctx['$']) {
+  try {
+    const email = c.req.query('email');
+    if (!email) {
+      return c.json({ success: false, message: 'Email is required' }, 400);
+    }
+
+    const messages = await c.env.DB.prepare(
+      `SELECT id, name, email, message, admin_reply, status, created_at
+       FROM chat_messages
+       WHERE email = ?
+       ORDER BY created_at DESC
+       LIMIT 20`
+    ).bind(email.toLowerCase()).all();
+
+    return c.json({
+      success: true,
+      messages: messages.results || [],
+      total: messages.results?.length || 0,
+    });
+  } catch (error: any) {
+    console.error('Error getting public messages:', error);
+    return c.json({ success: false, message: 'Failed to fetch messages' }, 500);
+  }
+}
+
+// ============================================================
 // GET UNREAD COUNT — by email (for badge display)
 // ============================================================
 export async function getUnreadCount(c: Ctx['$']) {

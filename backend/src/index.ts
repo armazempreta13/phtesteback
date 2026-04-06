@@ -18,7 +18,7 @@ import { getContract, generateContract, updateContract, revokeContract } from '.
 import { getClientProjects, getClientProject, getClientMessages, sendClientMessage } from './routes/client.routes';
 import { getSettings, updateSettings } from './routes/settings.routes';
 import { trackAnalytics } from './routes/analytics.routes';
-import { submitChatMessage, listChatMessages, replyToChatMessage, getUnreadCount, getChatStats } from './routes/chat.routes';
+import { submitChatMessage, listChatMessages, replyToChatMessage, getPublicMessages, getUnreadCount, getChatStats } from './routes/chat.routes';
 import { authMiddleware, requireAdmin, setAuthContext, verifyToken as middlewareVerifyToken, authRateLimiter } from './middleware';
 import { Env, Variables } from './app';
 
@@ -106,6 +106,7 @@ app.post('/api/transactions/:id/webhook', webhookTransaction);
 
 // Chat messages (direct conversation with admin)
 app.post('/api/chat/messages', submitChatMessage);
+app.get('/api/chat/messages/public', getPublicMessages);
 app.get('/api/chat/messages', setAuthContext, authMiddleware, requireAdmin, listChatMessages);
 app.put('/api/chat/messages/:id/reply', setAuthContext, authMiddleware, requireAdmin, replyToChatMessage);
 

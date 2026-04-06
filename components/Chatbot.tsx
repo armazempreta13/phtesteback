@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageCircle, X, Send, CheckSquare, Square, ChevronRight, Clock, ShieldAlert, RefreshCcw, Code2, Bot, Sparkles, HelpCircle, Briefcase, Info } from 'lucide-react';
+import { MessageCircle, X, Send, CheckSquare, Clock, ShieldAlert, RefreshCcw, Code2, Briefcase, Info } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { BudgetData, ChatMessage, ChatOption, ChatbotProps } from '../types';
 import { PROCESS_STEPS, CONTACT_CONFIG } from '../constants';
@@ -10,16 +10,11 @@ import { useCookieConsent } from '../hooks/useCookieConsent';
 import { useMobile } from '../hooks/useMobile';
 
 const CHAT_TRIGGERS = [
-  "Posso ajudar no seu projeto? 👋",
-  "Vamos criar algo incrível hoje? 🚀",
-  "Dúvidas sobre os pacotes? 🤔",
-  "Faça um orçamento sem compromisso! 💰",
-  "Transforme sua ideia em site 🌐",
-  "Precisa de um Frontend Especialista? 👨‍💻",
-  "Bora escalar seu negócio? 📈",
-  "Sites rápidos e modernos aqui ⚡",
-  "Me chama para conversar! 💬",
-  "Qual seu próximo desafio? 🏆"
+  "Precisa de um site?",
+  "Faça um orçamento grátis",
+  "Tire suas dúvidas aqui",
+  "Vamos criar seu projeto?",
+  "Fale comigo agora"
 ];
 
 const SUPPORT_KEYWORDS = [
@@ -42,13 +37,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, onNavigate,
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-
   const isMounted = useRef(true);
-
-  // Quick message (persistent "Falar com PH" inline)
-  const [showQuickMessage, setShowQuickMessage] = useState(false);
-  const quickMessageRef = useRef<HTMLTextAreaElement>(null);
-  const [quickMessageInput, setQuickMessageInput] = useState('');
 
   // Contextual page awareness
   const [pageContext, setPageContext] = useState<string>('home');
@@ -136,27 +125,39 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, onNavigate,
   // Check for unread admin replies on open
   const checkAdminReplies = async () => {
     try {
-      const storedName = localStorage.getItem('chat_name');
       const storedEmail = localStorage.getItem('chat_email');
-      if (!storedName) return;
+      if (!storedEmail) return;
 
-      const res = await api.request<{ success: boolean; messages: any[]; total: number }>(
-        `/chat/messages${storedEmail ? `?email=${encodeURIComponent(storedEmail)}` : ''}`
+      const res = await fetch(
+        `/api/chat/messages/public?email=${encodeURIComponent(storedEmail)}`
       );
-      if (res?.messages) {
-        const repliedMsgs = res.messages.filter((m: any) => m.status === 'replied' && m.admin_reply);
-        const lastRepliedId = repliedMsgs.length > 0 ? repliedMsgs[0].id : null;
-        const seenId = localStorage.getItem('chat_seen_reply_id');
-        const newReplies = repliedMsgs.filter((m: any) => m.id !== seenId);
+      const data = await res.json();
+      if (data?.success && data.messages) {
+        const repliedMsgs = data.messages.filter((m: any) => m.admin_reply);
+        if (repliedMsgs.length > 0) {
+          const seenIds = JSON.parse(localStorage.getItem('chat_seen_reply_ids') || '[]');
+          const newReplies = repliedMsgs.filter((m: any) => !seenIds.includes(m.id));
 
-        setUnreadReplies(newReplies.length);
+          setUnreadReplies(newReplies.length);
 
-        // If has new replies and user has name, show them
-        if (newReplies.length > 0 && storedName) {
-          const lastReply = repliedMsgs[0];
-          addBotMessage(`O PH respondeu sua mensagem! 📩\n\n"${lastReply.admin_reply}"`, 'text');
-          localStorage.setItem('chat_seen_reply_id', String(lastRepliedId));
-          setUnreadReplies(0);
+          if (newReplies.length > 0) {
+            // Show replies as notification cards, not bot messages
+            for (const reply of newReplies) {
+              const replyDate = new Date(reply.created_at).toLocaleDateString('pt-BR', {
+                day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
+              });
+              setMessages(prev => [...prev, {
+                id: `reply-${reply.id}`,
+                text: '',
+                isUser: false,
+                type: 'admin-reply',
+                meta: { name: reply.admin_reply, date: replyDate, originalMsg: reply.message }
+              }]);
+            }
+            const allSeenIds = [...seenIds, ...newReplies.map((m: any) => m.id)];
+            localStorage.setItem('chat_seen_reply_ids', JSON.stringify(allSeenIds));
+            setUnreadReplies(0);
+          }
         }
       }
     } catch (e) { /* silent */ }
@@ -526,30 +527,6 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, onNavigate,
       }
   };
 
-  const handleDirectMessageInline = () => {
-    setShowQuickMessage(prev => !prev);
-  };
-
-  const handleQuickMessageSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!quickMessageInput.trim()) return;
-
-    const message = budgetData.name
-      ? `Nome: ${budgetData.name}${budgetData.email ? `\nEmail: ${budgetData.email}` : ''}\nTipo: ${budgetData.projectType || 'Não definido'}\n\nMensagem: ${quickMessageInput.trim()}`
-      : `Olá! Vim pelo chat do site.\n\nNome: ${budgetData.inputValue || 'Não informado'}\n\nMensagem: ${quickMessageInput.trim()}`;
-
-    addUserMessage(`💬 ${quickMessageInput.trim()}`);
-    setQuickMessageInput('');
-    setShowQuickMessage(false);
-
-    try {
-      await saveDirectMessage(message);
-      addBotMessage('Entendido! Sua mensagem foi enviada. O PH vai te responder em breve. 🙌');
-    } catch (err) {
-      addBotMessage('Houve um problema ao enviar. Tente novamente ou fale pelo WhatsApp. ⚠️');
-    }
-  };
-
   const saveDirectMessage = async (message: string) => {
     try {
       await api.chat.sendMessage({
@@ -592,7 +569,6 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, onNavigate,
   const handleDirectContact = () => {
     const message = `Olá! Vim pelo chat do site e gostaria de falar com um atendente.\n\nNome: ${budgetData.name || budgetData.inputValue || 'Não informado'}\n`;
     if (budgetData.projectType) {
-      // Already has budget data — skip to confirm
       addUserMessage('💬 Falar com atendente');
       saveDirectMessage(message);
       addBotMessage('Entendido! Sua mensagem foi enviada. O PH vai te responder em breve. 🙌');
@@ -691,44 +667,6 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, onNavigate,
             {/* Messages Area */}
             <div className="flex-1 overflow-y-auto p-4 bg-gray-50 dark:bg-[#0B0D12] space-y-5 scroll-smooth relative pb-4 transition-colors duration-300">
 
-              {/* Persistent "Falar com PH" inline button */}
-              <div className="flex items-center justify-center py-1">
-                {!showQuickMessage ? (
-                  <button
-                    onClick={handleDirectMessageInline}
-                    className="inline-flex items-center gap-1.5 px-3 py-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 text-xs rounded-full transition-all active:scale-95 shadow-sm border border-gray-300 dark:border-gray-600"
-                  >
-                    💬 Falar com PH
-                  </button>
-                ) : (
-                  <form onSubmit={handleQuickMessageSubmit} className="w-full max-w-[90%] flex items-center gap-1.5">
-                    <textarea
-                      ref={quickMessageRef}
-                      value={quickMessageInput}
-                      onChange={(e) => setQuickMessageInput(e.target.value)}
-                      placeholder="Escreva sua mensagem..."
-                      rows={1}
-                      autoFocus
-                      className="flex-1 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-xs rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-primary-500/50 resize-none border border-gray-200 dark:border-gray-700"
-                    />
-                    <button
-                      type="submit"
-                      disabled={!quickMessageInput.trim()}
-                      className="p-1.5 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm bg-primary-600 hover:bg-primary-700 shrink-0"
-                    >
-                      <Send size={14} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setShowQuickMessage(false); setQuickMessageInput(''); }}
-                      className="p-1.5 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 rounded-lg transition-colors shrink-0"
-                    >
-                      <X size={14} />
-                    </button>
-                  </form>
-                )}
-              </div>
-
               <AnimatePresence mode="popLayout">
                   {messages.map((msg, index) => {
                       const isLastMessage = index === messages.length - 1;
@@ -748,7 +686,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, onNavigate,
                                   </div>
                               )}
                               
-                              {msg.type !== 'process-info' && (
+                              {msg.type !== 'process-info' && msg.type !== 'admin-reply' && (
                                 <div className={`px-4 py-3 text-sm shadow-sm leading-relaxed whitespace-pre-wrap transition-colors duration-500 ${
                                     msg.isUser 
                                     ? `${chatMode === 'support' ? 'bg-indigo-600' : 'bg-primary-600'} text-white rounded-2xl rounded-br-sm` 
@@ -782,6 +720,28 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, onNavigate,
                                         ))}
                                     </div>
                               </div>
+                          )}
+
+                          {msg.type === 'admin-reply' && (
+                              <motion.div
+                                  initial={{ opacity: 0, y: 15 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  className="ml-0 w-full max-w-full"
+                              >
+                                  <div className="bg-gradient-to-br from-primary-50 to-amber-50 dark:from-primary-950/30 dark:to-amber-950/20 border border-primary-200 dark:border-primary-800 rounded-xl overflow-hidden shadow-sm">
+                                      <div className="flex items-center gap-2 px-4 py-2.5 bg-primary-100 dark:bg-primary-900/40 border-b border-primary-200 dark:border-primary-800">
+                                          <span className="text-sm">📩</span>
+                                          <p className="text-xs font-bold text-primary-800 dark:text-primary-300">PH respondeu você</p>
+                                          <span className="ml-auto text-[10px] text-gray-500 dark:text-gray-400">{msg.meta?.date}</span>
+                                      </div>
+                                      <div className="p-4">
+                                          {msg.meta?.originalMsg && (
+                                              <p className="text-[10px] text-gray-500 dark:text-gray-500 mb-2 italic">Sua mensagem: "{msg.meta.originalMsg.slice(0, 80)}{msg.meta.originalMsg.length > 80 ? '...' : ''}"</p>
+                                          )}
+                                          <p className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap leading-relaxed">{msg.meta?.name}</p>
+                                      </div>
+                                  </div>
+                              </motion.div>
                           )}
 
                           {!msg.isUser && msg.options && msg.type === 'options' && (
@@ -880,36 +840,6 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, onNavigate,
               )}
             </div>
 
-            {/* Quick Replies Bar */}
-            <div className="px-4 py-1 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 shrink-0">
-                <div className="flex gap-1.5 justify-center">
-                    <button
-                        onClick={() => {
-                            if (messages.length > 0) {
-                                messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-                            } else {
-                                initializeChat();
-                            }
-                        }}
-                        className="px-2.5 py-1 text-xs bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full transition-all active:scale-95 border border-gray-200 dark:border-gray-700"
-                    >
-                        📋 Orçamento
-                    </button>
-                    <button
-                        onClick={handleDirectMessageInline}
-                        className="px-2.5 py-1 text-xs bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full transition-all active:scale-95 border border-gray-200 dark:border-gray-700"
-                    >
-                        💬 Falar com PH
-                    </button>
-                    <button
-                        onClick={() => handleSwitchMode('support')}
-                        className="px-2.5 py-1 text-xs bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full transition-all active:scale-95 border border-gray-200 dark:border-gray-700"
-                    >
-                        ❓ Dúvidas
-                    </button>
-                </div>
-            </div>
-
             {/* Input Area */}
             <form onSubmit={handleInputSubmit} className="p-4 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 shrink-0 transition-colors duration-300">
                <div className="relative flex items-center">
@@ -943,12 +873,13 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, onNavigate,
            <AnimatePresence>
              {showTrigger && (
                <motion.div
-                 initial={{ opacity: 0, x: 20, scale: 0.8 }}
-                 animate={{ opacity: 1, x: 0, scale: 1 }}
-                 exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.2 } }}
-                 className="absolute bottom-full mb-4 right-0 bg-white dark:bg-gray-800 px-4 py-3 rounded-2xl rounded-br-sm shadow-xl border border-gray-100 dark:border-gray-700 whitespace-nowrap origin-bottom-right"
+                 initial={{ opacity: 0, x: 10 }}
+                 animate={{ opacity: 1, x: 0 }}
+                 exit={{ opacity: 0, x: 10, transition: { duration: 0.15 } }}
+                 transition={{ duration: 0.3, ease: 'easeOut' }}
+                 className="absolute right-full mr-3 top-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 px-3.5 py-2 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 origin-right max-w-[220px]"
                >
-                 <p className="text-sm font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                 <p className="text-xs font-semibold text-gray-800 dark:text-white">
                     {activeTrigger}
                  </p>
                </motion.div>
@@ -960,9 +891,9 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, onNavigate,
              className="group relative flex items-center justify-center w-16 h-16 bg-primary-600 rounded-full text-white shadow-lg shadow-primary-600/30 hover:shadow-primary-600/50 hover:-translate-y-1 transition-all duration-300"
            >
              <span className="absolute inset-0 rounded-full border-2 border-primary-400 opacity-0 group-hover:opacity-100 group-hover:animate-ping duration-1000"></span>
-             
+
              <MessageCircle size={32} fill="currentColor" className="relative z-10" />
-             
+
              <span className="absolute top-0 right-0 flex h-4 w-4">
                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500 border-2 border-white dark:border-gray-900"></span>
