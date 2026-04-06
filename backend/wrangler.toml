@@ -6,14 +6,14 @@ compatibility_flags = ["nodejs_compat"]
 # D1 Database
 [[d1_databases]]
 binding = "DB"
-database_name = "phdev-db"
-database_id = "DATABASE_ID_PLACEHOLDER"
+database_name = "phstatic-db"
+database_id = "81f26061-6195-4717-8ced-98da9214f01d"
 migrations_dir = "migrations"
 
 # KV for sessions, rate limiting, and blacklist
 [[kv_namespaces]]
 binding = "KV"
-id = "KV_ID_PLACEHOLDER"
+id = "fed3c38f264e49fb931197f359b5e003"
 
 # R2 for file uploads
 [[r2_buckets]]
