@@ -1,0 +1,38 @@
+
+-- ==============================================================================
+-- FUNÇÃO DE LOGIN PARA PORTFÓLIO (Bypass Auth for Demo)
+-- Permite que clientes acessem via credenciais salvas no metadata do projeto.
+-- ==============================================================================
+
+-- 1. Função segura para verificar credenciais
+CREATE OR REPLACE FUNCTION public.check_portfolio_credentials(email_input text, password_input text)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER -- Roda com permissão de admin para ler dados privados
+AS $$
+DECLARE
+  found_project public.projects%ROWTYPE;
+BEGIN
+  -- Busca projeto onde o email bate e a senha no metadata bate
+  SELECT * INTO found_project
+  FROM public.projects
+  WHERE metadata->>'client_email' ILIKE email_input
+  AND metadata->>'temp_password' = password_input
+  LIMIT 1;
+
+  IF found_project.id IS NOT NULL THEN
+    -- Retorna dados do projeto + flag de sucesso
+    RETURN jsonb_build_object(
+      'success', true,
+      'role', 'client',
+      'project', row_to_json(found_project)
+    );
+  ELSE
+    RETURN jsonb_build_object('success', false);
+  END IF;
+END;
+$$;
+
+-- 2. Garantir que o metadata possa ser atualizado pelo Admin
+-- (Já coberto pelas políticas anteriores, mas reforçando)
+GRANT EXECUTE ON FUNCTION public.check_portfolio_credentials TO anon, authenticated, service_role;

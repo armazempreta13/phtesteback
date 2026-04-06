@@ -1,0 +1,803 @@
+import React, { useRef, useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { X, Printer, Copy, FileText, CheckCircle2, PenTool, Eraser, Undo, Download, ShieldAlert, AlertCircle, Send, Mail, UserCheck, Lock, ArrowDown } from 'lucide-react';
+import { ClientProject } from '../types';
+import { Button } from './Button';
+
+interface ContractModalProps {
+  project: ClientProject;
+  onClose: () => void;
+  userRole?: 'admin' | 'client'; // Novo prop para saber quem está vendo
+  onContractUpdate?: (data: any) => void; // Callback para salvar no contexto
+}
+
+// --- MOTOR DE ASSINATURA 'SMOOTH INK' + VALIDAÇÃO ---
+const SignaturePad = ({ onSave, onCancel }: { onSave: (dataUrl: string) => void, onCancel: () => void }) => {
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const [isDrawing, setIsDrawing] = useState(false);
+    const [points, setPoints] = useState<{x: number, y: number, time: number}[]>([]);
+    const [error, setError] = useState<string | null>(null);
+    
+    // Configurações da Caneta
+    const MIN_WIDTH = 1.0;
+    const MAX_WIDTH = 4.0;
+    const VELOCITY_FILTER_WEIGHT = 0.7;
+    const MIN_SIGNATURE_LENGTH = 250; 
+    
+    const [ctx, setCtx] = useState<CanvasRenderingContext2D | null>(null);
+    const lastWidth = useRef(MAX_WIDTH);
+    const totalDistance = useRef(0);
+
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+
+        // Função de inicialização com delay para garantir que o layout/animação terminou
+        const initCanvas = () => {
+            const ratio = Math.max(window.devicePixelRatio || 1, 1);
+            const rect = canvas.getBoundingClientRect();
+            
+            // Se as dimensões ainda não estiverem prontas, tenta novamente em breve
+            if (rect.width === 0 || rect.height === 0) {
+                setTimeout(initCanvas, 50);
+                return;
+            }
+
+            canvas.width = rect.width * ratio;
+            canvas.height = rect.height * ratio;
+            
+            const context = canvas.getContext('2d');
+            if (context) {
+                context.scale(ratio, ratio);
+                context.lineCap = 'round';
+                context.lineJoin = 'round';
+                context.strokeStyle = '#000000';
+                setCtx(context);
+            }
+        };
+
+        // Pequeno delay inicial para aguardar renderização do modal
+        const timer = setTimeout(initCanvas, 100);
+
+        const preventDefault = (e: TouchEvent) => {
+            if (e.target === canvas) e.preventDefault();
+        };
+        document.body.addEventListener('touchstart', preventDefault, { passive: false });
+        document.body.addEventListener('touchmove', preventDefault, { passive: false });
+        document.body.addEventListener('touchend', preventDefault, { passive: false });
+
+        return () => {
+            clearTimeout(timer);
+            document.body.removeEventListener('touchstart', preventDefault);
+            document.body.removeEventListener('touchmove', preventDefault);
+            document.body.removeEventListener('touchend', preventDefault);
+        };
+    }, []);
+
+    const getPoint = (e: React.PointerEvent | React.MouseEvent | React.TouchEvent) => {
+        const canvas = canvasRef.current;
+        if (!canvas) return { x: 0, y: 0, time: 0 };
+        const rect = canvas.getBoundingClientRect();
+        
+        let clientX, clientY;
+        if ('touches' in e) {
+            clientX = e.touches[0].clientX;
+            clientY = e.touches[0].clientY;
+        } else {
+            // @ts-ignore
+            clientX = e.clientX;
+            // @ts-ignore
+            clientY = e.clientY;
+        }
+
+        return {
+            x: clientX - rect.left,
+            y: clientY - rect.top,
+            time: new Date().getTime()
+        };
+    };
+
+    const startDrawing = (e: any) => {
+        setIsDrawing(true);
+        setError(null);
+        const point = getPoint(e);
+        setPoints([point]);
+        
+        if (ctx) {
+            ctx.beginPath();
+            ctx.arc(point.x, point.y, (MAX_WIDTH + MIN_WIDTH) / 4, 0, Math.PI * 2);
+            ctx.fillStyle = 'black';
+            ctx.fill();
+        }
+        lastWidth.current = (MAX_WIDTH + MIN_WIDTH) / 2;
+    };
+
+    const draw = (e: any) => {
+        if (!isDrawing || !ctx) return;
+        e.preventDefault(); 
+
+        const point = getPoint(e);
+        const newPoints = [...points, point];
+        setPoints(newPoints);
+
+        if (newPoints.length > 2) {
+            const lastPoint = newPoints[newPoints.length - 2];
+            const controlPoint = newPoints[newPoints.length - 3];
+            const endPoint = {
+                x: (lastPoint.x + point.x) / 2,
+                y: (lastPoint.y + point.y) / 2,
+            };
+
+            const dist = Math.sqrt(Math.pow(point.x - lastPoint.x, 2) + Math.pow(point.y - lastPoint.y, 2));
+            const time = point.time - lastPoint.time;
+            const velocity = time > 0 ? dist / time : 0;
+            
+            totalDistance.current += dist;
+
+            const targetWidth = Math.max(MIN_WIDTH, MAX_WIDTH / (velocity + 1));
+            const newWidth = lastWidth.current * VELOCITY_FILTER_WEIGHT + targetWidth * (1 - VELOCITY_FILTER_WEIGHT);
+
+            ctx.beginPath();
+            ctx.moveTo(controlPoint.x, controlPoint.y);
+            ctx.quadraticCurveTo(lastPoint.x, lastPoint.y, endPoint.x, endPoint.y);
+            ctx.lineWidth = newWidth;
+            ctx.stroke();
+
+            lastWidth.current = newWidth;
+        }
+    };
+
+    const stopDrawing = () => {
+        setIsDrawing(false);
+    };
+
+    const clearCanvas = () => {
+        const canvas = canvasRef.current;
+        if (canvas && ctx) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height); // Limpa o canvas físico (scaled)
+            setPoints([]);
+            totalDistance.current = 0; 
+            setError(null);
+        }
+    };
+
+    const handleSave = () => {
+        if (totalDistance.current < MIN_SIGNATURE_LENGTH) {
+            setError("Assinatura muito curta. Por favor, assine seu nome completo.");
+            return;
+        }
+
+        const canvas = canvasRef.current;
+        if (canvas) {
+            const dataUrl = canvas.toDataURL('image/png');
+            onSave(dataUrl);
+        }
+    };
+
+    return (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-gray-900/80 backdrop-blur-sm p-4 animate-in fade-in duration-200 print:hidden">
+            <motion.div 
+                initial={{ scale: 0.9, opacity: 0 }} 
+                animate={{ scale: 1, opacity: 1 }}
+                className="bg-white rounded-2xl w-full max-w-lg shadow-2xl flex flex-col overflow-hidden"
+            >
+                <div className="flex justify-between items-center px-5 py-4 border-b border-gray-100 bg-gray-50">
+                    <h3 className="font-bold text-gray-900 flex items-center gap-2"><PenTool size={18} className="text-primary-600"/> Assinatura Digital</h3>
+                    <button onClick={onCancel} className="text-gray-400 hover:text-red-500"><X size={20}/></button>
+                </div>
+                
+                <div className="p-5 bg-gray-100 relative">
+                    <div className={`relative bg-white rounded-xl border-2 border-dashed overflow-hidden cursor-crosshair shadow-inner touch-none h-64 transition-colors duration-300 ${error ? 'border-red-300 bg-red-50' : 'border-gray-300'}`}>
+                        <div className="absolute bottom-16 left-10 right-10 border-b border-gray-200 pointer-events-none"></div>
+                        <p className="absolute bottom-12 right-10 text-[10px] text-gray-300 pointer-events-none uppercase tracking-widest">Assine acima</p>
+                        
+                        <canvas 
+                            ref={canvasRef}
+                            className="w-full h-full block"
+                            onMouseDown={startDrawing}
+                            onMouseMove={draw}
+                            onMouseUp={stopDrawing}
+                            onMouseLeave={stopDrawing}
+                            onTouchStart={startDrawing}
+                            onTouchMove={draw}
+                            onTouchEnd={stopDrawing}
+                        />
+                    </div>
+
+                    <AnimatePresence>
+                        {error && (
+                            <motion.div 
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0 }}
+                                className="absolute bottom-20 left-0 right-0 flex justify-center pointer-events-none"
+                            >
+                                <div className="bg-red-500 text-white text-xs font-bold px-4 py-2 rounded-full shadow-lg flex items-center gap-2">
+                                    <AlertCircle size={14} /> {error}
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
+
+                <div className="flex justify-between items-center px-5 py-4 border-t border-gray-100 bg-white">
+                    <button onClick={clearCanvas} className="text-sm text-red-500 hover:text-red-700 flex items-center gap-1 px-3 py-2 rounded-lg hover:bg-red-50 transition-colors font-medium">
+                        <Eraser size={16} /> Limpar
+                    </button>
+                    <div className="flex gap-2">
+                        <Button variant="ghost" onClick={onCancel} size="sm">Cancelar</Button>
+                        <Button onClick={handleSave} size="sm" leftIcon={<CheckCircle2 size={16}/>} className="bg-primary-600 text-white hover:bg-primary-700">Confirmar</Button>
+                    </div>
+                </div>
+            </motion.div>
+        </div>
+    );
+};
+
+export const ContractGeneratorModal: React.FC<ContractModalProps> = ({ project, onClose, userRole = 'admin', onContractUpdate }) => {
+  const [showSignaturePad, setShowSignaturePad] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  
+  // Controle de Leitura
+  const [hasReadContract, setHasReadContract] = useState(false);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  
+  const printRef = useRef<HTMLDivElement>(null);
+
+  // Estados locais para assinaturas (podem vir do projeto)
+  const [adminSig, setAdminSig] = useState<string | null>(project.contract?.adminSignature || null);
+  const [clientSig, setClientSig] = useState<string | null>(project.contract?.clientSignature || null);
+  const [status, setStatus] = useState<'draft' | 'sent_to_client' | 'signed'>(project.contract?.status || 'draft');
+
+  const currentDate = new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
+  const formattedValue = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(project.financial.total);
+
+  // Verificar se o conteúdo é pequeno o suficiente para não precisar de scroll inicial
+  useEffect(() => {
+      const checkHeight = () => {
+          if (scrollContainerRef.current) {
+              const { scrollHeight, clientHeight } = scrollContainerRef.current;
+              // Se não tem scroll ou é muito pequeno, considera lido
+              if (scrollHeight <= clientHeight + 50) {
+                  setHasReadContract(true);
+              }
+          }
+      };
+      
+      // Delay pequeno para garantir renderização
+      setTimeout(checkHeight, 300);
+      window.addEventListener('resize', checkHeight);
+      return () => window.removeEventListener('resize', checkHeight);
+  }, []);
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+      if (hasReadContract) return; // Se já leu, não precisa checar mais
+
+      const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+      // Tolerância de 50px para considerar que chegou ao fim
+      if (scrollHeight - scrollTop <= clientHeight + 50) {
+          setHasReadContract(true);
+      }
+  };
+
+  const handleScrollToBottom = () => {
+      if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollTo({
+              top: scrollContainerRef.current.scrollHeight,
+              behavior: 'smooth'
+          });
+      }
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleSignatureSave = (dataUrl: string) => {
+      if (userRole === 'admin') {
+          setAdminSig(dataUrl);
+      } else {
+          setClientSig(dataUrl);
+      }
+      setShowSignaturePad(false);
+  };
+
+  const handleAction = async () => {
+      setIsProcessing(true);
+      await new Promise(resolve => setTimeout(resolve, 1500)); // Simula envio/salvamento
+
+      if (userRole === 'admin') {
+          // Admin enviando para o cliente
+          if (onContractUpdate) {
+              onContractUpdate({
+                  adminSignature: adminSig,
+                  status: 'sent_to_client',
+                  sentAt: new Date().toISOString()
+              });
+          }
+          setStatus('sent_to_client');
+      } else {
+          // Cliente assinando e finalizando
+          if (onContractUpdate) {
+              onContractUpdate({
+                  clientSignature: clientSig,
+                  status: 'signed',
+                  signedAt: new Date().toISOString()
+              });
+          }
+          setStatus('signed');
+      }
+      setIsProcessing(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <motion.div 
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        onClick={onClose} 
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm print:hidden"
+      />
+
+      {/* Signature Pad Overlay */}
+      {showSignaturePad && (
+          <SignaturePad 
+            onSave={handleSignatureSave}
+            onCancel={() => setShowSignaturePad(false)}
+          />
+      )}
+
+      {/* Modal Container */}
+      <motion.div 
+        initial={{ scale: 0.95, opacity: 0, y: 20 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.95, opacity: 0, y: 20 }}
+        className="relative w-full max-w-5xl bg-white dark:bg-[#1A1D24] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+      >
+        
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-[#151921] print:hidden">
+            <div className="flex items-center gap-3">
+                <div className="bg-slate-800 text-white p-2 rounded-lg shadow-md">
+                    <FileText size={20} />
+                </div>
+                <div>
+                    <h3 className="font-bold text-gray-900 dark:text-white text-lg">Contrato de Serviço</h3>
+                    <p className="text-xs text-gray-500 font-medium">
+                        {status === 'signed' ? 'Documento Finalizado & Assinado' : 'Minuta Jurídica Blindada'}
+                    </p>
+                </div>
+            </div>
+            <div className="flex gap-2">
+                <Button variant="ghost" onClick={onClose} className="hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20">
+                    <X size={20} />
+                </Button>
+            </div>
+        </div>
+
+        {/* Contract Preview Area */}
+        <div 
+            ref={scrollContainerRef}
+            onScroll={handleScroll}
+            className="flex-1 overflow-y-auto bg-gray-100 dark:bg-black/50 p-8 print:p-0 print:overflow-visible print:bg-white custom-scrollbar relative scroll-smooth"
+        >
+            
+            {/* Scroll Alert for Client */}
+            {userRole === 'client' && !hasReadContract && status === 'sent_to_client' && !clientSig && (
+                <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-20 print:hidden">
+                    <button 
+                        onClick={handleScrollToBottom}
+                        className="bg-primary-600 text-white px-4 py-2 rounded-full shadow-lg text-xs font-bold animate-bounce flex items-center gap-2 hover:bg-primary-700 transition-colors"
+                    >
+                        <ArrowDown size={14} /> Ler até o final para Assinar
+                    </button>
+                </div>
+            )}
+
+            {/* A4 Paper Simulation */}
+            <div 
+                ref={printRef}
+                className="bg-white text-black mx-auto max-w-[210mm] min-h-[297mm] p-[20mm] shadow-2xl print:shadow-none print:m-0 print:w-full print:max-w-none print:min-h-0 print:p-[15mm] font-serif text-[11pt] leading-relaxed text-justify relative"
+            >
+                {/* Contract Content */}
+                <h1 className="text-center font-bold text-lg mb-8 uppercase border-b-2 border-black pb-4">Contrato de Prestação de Serviços de Desenvolvimento de Software</h1>
+
+                <div className="mb-6 space-y-4">
+                    <p>
+                        <strong>CONTRATADA:</strong> <strong>JOÃO PHILIPPE DE OLIVEIRA BOECHAT</strong>, pessoa física inscrita no CPF sob o nº <strong>053.795.071-07</strong> e portador do RG nº 3.755.968, doravante denominado simplesmente CONTRATADA.
+                    </p>
+
+                    <p>
+                        <strong>CONTRATANTE:</strong> <strong>{project.clientName.toUpperCase()}</strong>, portador(a) do e-mail <strong>{project.email}</strong>, e inscrito(a) no CPF/CNPJ sob o nº <strong>{project.cpf || "______________________"}</strong>, doravante denominado(a) simplesmente CONTRATANTE.
+                    </p>
+
+                    <p>
+                        As partes têm, entre si, justo e acertado o presente Contrato, regido pelas cláusulas abaixo:
+                    </p>
+                </div>
+
+                <h2 className="font-bold uppercase mt-8 mb-2 text-sm bg-gray-100 p-1 print:bg-transparent print:p-0">Cláusula 1ª - Do Objeto e Escopo</h2>
+                <p className="mb-2">
+                    <strong>1.1.</strong> O objeto é o desenvolvimento da Interface Visual (Frontend) de um Website/Aplicação Web denominado <strong>"{project.projectName}"</strong>. O serviço contempla exclusivamente:
+                </p>
+                <ul className="list-disc pl-5 space-y-1 mb-4 text-sm">
+                    <li>Codificação da Interface Gráfica (Layout) utilizando tecnologias web modernas (HTML, CSS, Javascript/React/Next.js).</li>
+                    <li>Estruturação de páginas e menus de navegação conforme briefing aprovado.</li>
+                    <li>Implementação de Responsividade (adaptação visual para celulares/tablets).</li>
+                </ul>
+
+                <p className="mb-2">
+                    <strong>1.2. EXCLUSÕES EXPRESSAS</strong> (O que NÃO será feito):
+                </p>
+                <ul className="list-disc pl-5 space-y-1 mb-4 text-sm">
+                    <li><strong>Integrações Funcionais:</strong> Configuração de gateways de pagamento, APIs de frete, emissão de nota fiscal ou lógica de vendas.</li>
+                    <li><strong>Backend/Dados:</strong> Criação de banco de dados, painéis administrativos (dashboard), sistemas de login ou servidores.</li>
+                    <li>Inserção de conteúdo (textos/fotos) ou tratamento de imagens.</li>
+                    <li>Qualquer funcionalidade não descrita explicitamente na proposta inicial.</li>
+                </ul>
+
+                <h2 className="font-bold uppercase mt-6 mb-2 text-sm bg-gray-100 p-1 print:bg-transparent print:p-0">Cláusula 2ª - Dos Prazos, Aprovações e Validade</h2>
+                <p className="mb-4">
+                    <strong>2.1. Previsão de entrega:</strong> <strong>{project.dueDate}</strong>, sujeita ao envio pontual de materiais pelo CONTRATANTE. Atrasos no envio de materiais pausam automaticamente o cronograma de entrega.
+                </p>
+                <p className="mb-4">
+                    <strong>2.2. Limite de Alterações:</strong> O CONTRATANTE terá direito a 3 (três) rodadas de revisão no layout. Ajustes que fujam ao escopo inicial ou excedam as rodadas serão cobrados como horas técnicas adicionais (R$ 150,00/hora).
+                </p>
+                <p className="mb-4">
+                    <strong>2.3. Validade da Proposta:</strong> Os valores e prazos deste contrato são válidos para início imediato. Caso o projeto seja paralisado pelo CONTRATANTE por mais de 20 dias, poderá haver reajuste de valores na retomada.
+                </p>
+
+                <h2 className="font-bold uppercase mt-6 mb-2 text-sm bg-gray-100 p-1 print:bg-transparent print:p-0">Cláusula 3ª - Dos Valores e Blindagem de Pagamento</h2>
+                <p className="mb-4">
+                    <strong>Valor total: {formattedValue}</strong>.
+                    <br/>a) 50% de entrada (Sinal).
+                    <br/>b) 50% na entrega para homologação.
+                </p>
+                <p className="mb-4">
+                    <strong>3.1. Multas:</strong> Atrasos sujeitam a CONTRATANTE a multa de 2% + juros de 1% ao mês.
+                </p>
+                <p className="mb-4 p-2 border border-black bg-gray-50 print:bg-transparent print:border-black">
+                    <strong>3.2. Suspensão de Serviços (Lock-out):</strong> Em caso de atraso superior a 3 (três) dias no pagamento de qualquer parcela, a CONTRATADA reserva-se o direito de <strong>suspender imediatamente a execução dos serviços ou o acesso aos ambientes de teste</strong> até a regularização, sem prejuízo aos prazos de entrega.
+                </p>
+
+                <h2 className="font-bold uppercase mt-6 mb-2 text-sm bg-gray-100 p-1 print:bg-transparent print:p-0">Cláusula 4ª - Da Limitação de Responsabilidade</h2>
+                <p className="mb-4">
+                    <strong>4.1.</strong> A CONTRATADA desenvolve a interface visual (Frontend). Não é de responsabilidade da CONTRATADA:
+                </p>
+                <ul className="list-disc pl-5 space-y-1 mb-4 text-sm">
+                    <li>Falhas, lentidão ou queda de servidores de hospedagem contratados pelo CONTRATANTE.</li>
+                    <li>Erros em APIs de terceiros (Gateways de pagamento, Correios, etc.).</li>
+                    <li>Prejuízos financeiros decorrentes de "bugs" ou indisponibilidade do site.</li>
+                    <li>Segurança da informação (vazamento de dados) em servidores gerenciados por terceiros.</li>
+                </ul>
+
+                <h2 className="font-bold uppercase mt-6 mb-2 text-sm bg-gray-100 p-1 print:bg-transparent print:p-0">Cláusula 5ª - Da Rescisão e Multa Compensatória</h2>
+                <p className="mb-4">
+                    <strong>5.1. Desistência:</strong> Em caso de rescisão imotivada pelo CONTRATANTE:
+                    <br/>a) Fase Inicial: O valor do sinal (50%) será retido integralmente para custear reserva de agenda e horas trabalhadas.
+                    <br/>b) Fase Final (após entrega p/ homologação): Será devido o valor integral (100%) do contrato.
+                </p>
+                <p className="mb-4">
+                    <strong>5.2. Quebra de Contrato:</strong> A infração de qualquer cláusula ensejará multa não-compensatória de 20% (vinte por cento) sobre o valor total do contrato, além da cobrança dos valores em aberto.
+                </p>
+
+                <h2 className="font-bold uppercase mt-6 mb-2 text-sm bg-gray-100 p-1 print:bg-transparent print:p-0">Cláusula 6ª - Da Propriedade Intelectual</h2>
+                <p className="mb-4">
+                    O código-fonte é propriedade da CONTRATADA até a quitação total dos valores. O não pagamento da parcela final impede o CONTRATANTE de utilizar, publicar ou modificar o código, sob pena de violação de direitos autorais (Lei 9.610/98).
+                </p>
+
+                <h2 className="font-bold uppercase mt-6 mb-2 text-sm bg-gray-100 p-1 print:bg-transparent print:p-0">Cláusula 7ª - Do Foro</h2>
+                <p className="mb-12">
+                    Fica eleito o foro da comarca de <strong>Ceilândia - DF</strong>.
+                </p>
+
+                <p className="text-center mt-12 mb-16 italic text-gray-500">
+                    Brasília (Ceilândia), {currentDate}.
+                </p>
+
+                <div className="flex justify-between gap-12 mt-20 pt-4 align-bottom">
+                    {/* ASSINATURA CONTRATADA (ADMIN) */}
+                    <div className="flex-1 border-t border-black text-center pt-2 relative">
+                        {adminSig ? (
+                            <img 
+                                src={adminSig} 
+                                alt="Assinatura Contratada" 
+                                className="absolute bottom-6 left-1/2 -translate-x-1/2 h-20 pointer-events-none mix-blend-multiply"
+                            />
+                        ) : (
+                            <div className="absolute bottom-10 left-1/2 -translate-x-1/2 text-gray-300 text-xs italic font-sans pointer-events-none print:hidden bg-gray-50 px-2 py-1 rounded whitespace-nowrap">
+                                (Aguardando Contratada)
+                            </div>
+                        )}
+                        <p className="font-bold text-sm">JOÃO PHILIPPE DE OLIVEIRA BOECHAT</p>
+                        <p className="text-[10px] uppercase tracking-wider">CONTRATADA</p>
+                    </div>
+
+                    {/* ASSINATURA CONTRATANTE (CLIENTE) */}
+                    <div className="flex-1 border-t border-black text-center pt-2 relative">
+                        {clientSig ? (
+                            <img 
+                                src={clientSig} 
+                                alt="Assinatura Cliente" 
+                                className="absolute bottom-6 left-1/2 -translate-x-1/2 h-20 pointer-events-none mix-blend-multiply"
+                            />
+                        ) : (
+                            <div className="absolute bottom-10 left-1/2 -translate-x-1/2 text-gray-300 text-xs italic font-sans pointer-events-none print:hidden bg-gray-50 px-2 py-1 rounded whitespace-nowrap">
+                                (Aguardando Cliente)
+                            </div>
+                        )}
+                        <p className="font-bold text-sm">{project.clientName.toUpperCase()}</p>
+                        <p className="text-[10px] uppercase tracking-wider">CONTRATANTE</p>
+                    </div>
+                </div>
+                
+                {/* Print Footer Watermark */}
+                <div className="mt-8 text-[8px] text-gray-400 font-sans hidden print:block text-right">
+                    Documento gerado digitalmente via PH.dev Platform<br/>
+                    Autenticidade assegurada pela Lei 14.063/2020
+                </div>
+            </div>
+
+        </div>
+
+        {/* Footer Actions (Hidden on Print) */}
+        <div className="p-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-[#1A1D24] flex justify-end items-center gap-3 print:hidden shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-10">
+            
+            {/* LÓGICA DO ADMIN */}
+            {userRole === 'admin' && (
+                <>
+                    {status === 'draft' && !adminSig && (
+                        <Button variant="outline" onClick={() => setShowSignaturePad(true)} leftIcon={<PenTool size={16}/>} className="animate-pulse border-primary-500 text-primary-600 font-bold">
+                            Assinar como Contratada
+                        </Button>
+                    )}
+                    {status === 'draft' && adminSig && (
+                        <>
+                            <Button variant="ghost" onClick={() => setShowSignaturePad(true)} className="text-gray-400 hover:text-primary-600 text-xs">
+                                Refazer Assinatura
+                            </Button>
+                            <Button 
+                                onClick={handleAction} 
+                                className="bg-primary-600 hover:bg-primary-700 text-white shadow-lg shadow-primary-600/20"
+                                leftIcon={<Send size={16}/>}
+                                isLoading={isProcessing}
+                            >
+                                Enviar para o Cliente
+                            </Button>
+                        </>
+                    )}
+                    {(status === 'sent_to_client' || status === 'signed') && (
+                        <span className="text-xs font-bold text-green-600 flex items-center gap-1 bg-green-50 px-3 py-1.5 rounded-full mr-auto">
+                            <CheckCircle2 size={14}/> {status === 'signed' ? 'Contrato Finalizado' : 'Aguardando Cliente'}
+                        </span>
+                    )}
+                </>
+            )}
+
+            {/* LÓGICA DO CLIENTE */}
+            {userRole === 'client' && (
+                <>
+                    {status === 'sent_to_client' && !clientSig && (
+                        <>
+                            {!hasReadContract ? (
+                                <div className="flex items-center gap-3">
+                                    <p className="text-xs text-orange-600 font-bold flex items-center gap-1 animate-pulse">
+                                        <AlertCircle size={14} /> Segurança Jurídica: Leia todo o documento.
+                                    </p>
+                                    <Button disabled variant="secondary" leftIcon={<Lock size={16}/>} className="opacity-50 cursor-not-allowed">
+                                        Assinar Contrato
+                                    </Button>
+                                </div>
+                            ) : (
+                                <Button variant="outline" onClick={() => setShowSignaturePad(true)} leftIcon={<PenTool size={16}/>} className="animate-pulse border-primary-500 text-primary-600 font-bold">
+                                    Assinar como Contratante
+                                </Button>
+                            )}
+                        </>
+                    )}
+                    {status === 'sent_to_client' && clientSig && (
+                        <>
+                            <Button variant="ghost" onClick={() => setShowSignaturePad(true)} className="text-gray-400 hover:text-primary-600 text-xs">
+                                Refazer
+                            </Button>
+                            <Button 
+                                onClick={handleAction} 
+                                className="bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-600/20"
+                                leftIcon={<UserCheck size={16}/>}
+                                isLoading={isProcessing}
+                            >
+                                Finalizar Contrato
+                            </Button>
+                        </>
+                    )}
+                </>
+            )}
+
+            {/* Ações Comuns (Print & Download) */}
+            <div className="flex gap-2 ml-2 pl-2 border-l border-gray-200 dark:border-gray-700">
+                <Button variant="outline" onClick={handlePrint} className="border-gray-300 hover:bg-gray-100" leftIcon={<Printer size={16}/>}>
+                    Imprimir
+                </Button>
+                <Button variant="outline" onClick={handlePrint} className="border-gray-300 hover:bg-gray-100" leftIcon={<Download size={16}/>}>
+                    Salvar PDF
+                </Button>
+            </div>
+        </div>
+
+        {/* Print Styles - Professional Single Page */}
+        <style>{`
+            @media print {
+                /* Reset everything */
+                * {
+                    margin: 0;
+                    padding: 0;
+                    border: 0;
+                }
+                
+                html, body {
+                    width: 100%;
+                    height: 100%;
+                    background: white;
+                    color: black;
+                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                }
+                
+                @page {
+                    size: A4;
+                    margin: 0;
+                    padding: 0;
+                }
+                
+                /* Hide all elements by default */
+                body > * {
+                    display: none !important;
+                }
+                
+                /* Show only the modal */
+                div[class*="max-w-5xl"] {
+                    display: block !important;
+                    position: static !important;
+                    width: 100% !important;
+                    max-width: 100% !important;
+                    height: auto !important;
+                    max-height: none !important;
+                    background: white !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    border: none !important;
+                    box-shadow: none !important;
+                    border-radius: 0 !important;
+                    overflow: visible !important;
+                }
+                
+                /* Hide header and footer */
+                .print\\:hidden {
+                    display: none !important;
+                }
+                
+                /* Contract container */
+                div[class*="overflow-y-auto"] {
+                    display: block !important;
+                    overflow: visible !important;
+                    background: white !important;
+                    padding: 0 !important;
+                    margin: 0 !important;
+                    max-height: none !important;
+                    height: auto !important;
+                }
+                
+                /* A4 Paper container */
+                div[class*="max-w-\\[210mm\\]"] {
+                    width: 100% !important;
+                    max-width: 100% !important;
+                    height: auto !important;
+                    min-height: auto !important;
+                    margin: 0 !important;
+                    padding: 20mm !important;
+                    background: white !important;
+                    box-shadow: none !important;
+                    border: none !important;
+                    display: block !important;
+                    page-break-after: avoid;
+                }
+                
+                /* Typography */
+                h1 {
+                    font-size: 16pt !important;
+                    font-weight: bold !important;
+                    margin: 0 0 20pt 0 !important;
+                    text-align: center !important;
+                    border-bottom: 2px solid black !important;
+                    padding-bottom: 10pt !important;
+                    color: black !important;
+                }
+                
+                h2 {
+                    font-size: 11pt !important;
+                    font-weight: bold !important;
+                    margin: 15pt 0 10pt 0 !important;
+                    color: black !important;
+                    text-transform: uppercase !important;
+                    border-bottom: 1px solid #333 !important;
+                    padding-bottom: 5pt !important;
+                }
+                
+                p {
+                    font-size: 11pt !important;
+                    margin: 8pt 0 !important;
+                    color: black !important;
+                    line-height: 1.5 !important;
+                    text-align: justify !important;
+                    page-break-inside: avoid;
+                }
+                
+                strong, b {
+                    font-weight: bold !important;
+                    color: black !important;
+                }
+                
+                span {
+                    color: black !important;
+                }
+                
+                /* Lists */
+                ul, ol {
+                    margin: 10pt 0 10pt 30pt !important;
+                    color: black !important;
+                }
+                
+                li {
+                    font-size: 10pt !important;
+                    margin: 5pt 0 !important;
+                    color: black !important;
+                    page-break-inside: avoid;
+                }
+                
+                /* Remove backgrounds */
+                .bg-gray-100,
+                .bg-gray-50,
+                .bg-slate-800,
+                [class*="bg-"] {
+                    background: transparent !important;
+                }
+                
+                /* Borders */
+                .border-black,
+                .border-b {
+                    border-color: #000 !important;
+                }
+                
+                /* Divs */
+                div {
+                    color: black !important;
+                    background: transparent !important;
+                    page-break-inside: avoid;
+                }
+                
+                /* Images - signatures */
+                img {
+                    max-width: 100% !important;
+                    height: auto !important;
+                    display: block !important;
+                }
+                
+                /* Remove icons and interactive elements */
+                svg {
+                    display: none !important;
+                }
+                
+                /* Signature area */
+                .relative {
+                    page-break-inside: avoid;
+                }
+                
+                /* Force single page */
+                body {
+                    page-break-after: avoid;
+                }
+            }
+        `}</style>
+      </motion.div>
+    </div>
+  );
+};

@@ -1,0 +1,42 @@
+
+-- ==============================================================================
+-- FIX RLS: PERMITIR ACESSO VIA EMAIL (METADATA)
+-- Execute este script para que o cliente veja o projeto criado pelo admin.
+-- ==============================================================================
+
+-- 1. Remover política antiga restritiva
+DROP POLICY IF EXISTS "Cliente: Vê seus projetos" ON public.projects;
+
+-- 2. Criar nova política híbrida (ID do Usuário OU Email no Metadata)
+-- Isso permite que o projeto criado pelo Admin (user_id = admin) seja visto pelo cliente
+-- se o email do cliente estiver salvo no campo metadata->>'client_email'.
+CREATE POLICY "Cliente: Vê seus projetos" ON public.projects 
+FOR SELECT USING (
+  auth.uid() = user_id 
+  OR 
+  (metadata->>'client_email' ILIKE (select auth.jwt() ->> 'email'))
+);
+
+-- 3. Permitir que clientes atualizem seus projetos (para assinar contrato, etc)
+DROP POLICY IF EXISTS "Cliente: Atualiza seus projetos" ON public.projects;
+CREATE POLICY "Cliente: Atualiza seus projetos" ON public.projects 
+FOR UPDATE USING (
+  auth.uid() = user_id 
+  OR 
+  (metadata->>'client_email' ILIKE (select auth.jwt() ->> 'email'))
+);
+
+-- 4. Garantir que arquivos também sejam visíveis
+DROP POLICY IF EXISTS "Cliente: Vê arquivos do projeto" ON public.project_files;
+CREATE POLICY "Cliente: Vê arquivos do projeto" ON public.project_files 
+FOR SELECT USING (
+  EXISTS (
+    SELECT 1 FROM public.projects 
+    WHERE id = project_files.project_id 
+    AND (
+      user_id = auth.uid() 
+      OR 
+      (metadata->>'client_email' ILIKE (select auth.jwt() ->> 'email'))
+    )
+  )
+);

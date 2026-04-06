@@ -1,0 +1,4 @@
+
+-- Adiciona coluna metadata para armazenar email/nome do cliente quando o usuário ainda não existe no Auth
+ALTER TABLE public.projects 
+ADD COLUMN IF NOT EXISTS metadata jsonb DEFAULT '{}'::jsonb;

@@ -1,0 +1,126 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR" class="scroll-smooth">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    
+    <!-- SEO: Bot Control -->
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="googlebot" content="index, follow" />
+
+    <!-- PWA / App-Like Feel -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)">
+    
+    <!-- SEO: Resource Hints (Performance Vitals) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://images.unsplash.com" crossorigin>
+    <link rel="preconnect" href="https://cdn.tailwindcss.com">
+    <link rel="dns-prefetch" href="https://www.googletagmanager.com">
+    
+    <!-- SEO Base (Will be overwritten dynamically by React Helmet) -->
+    <title>PH.dev | Especialista em Criação de Sites</title>
+    <meta name="description" content="Desenvolvedor Frontend Sênior. Sites de alta performance e Landing Pages." />
+    
+    <!-- CRITICAL IMAGE PRELOAD (INSTANT LOADING STRATEGY) -->
+    <!-- About Image -->
+    <link rel="preload" as="image" href="https://i.imgur.com/TNMBi27.jpeg" fetchpriority="high" />
+    
+    <!-- Portfolio Images (Preloaded for instant visibility) -->
+    <link rel="preload" as="image" href="https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?q=80&w=2000&auto=format&fit=crop" />
+    <link rel="preload" as="image" href="https://images.unsplash.com/photo-1487958449943-2429e8be8625?q=80&w=2000&auto=format&fit=crop" />
+    <link rel="preload" as="image" href="https://images.unsplash.com/photo-1614728423169-3f65fd722b7e?q=80&w=2000&auto=format&fit=crop" />
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Poppins:wght@500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              primary: {
+                50: '#f5f3ff',
+                100: '#ede9fe',
+                200: '#ddd6fe',
+                300: '#c4b5fd',
+                400: '#a78bfa',
+                500: '#8b5cf6',
+                600: '#7c3aed',
+                700: '#6d28d9',
+                800: '#5b21b6',
+                900: '#4c1d95',
+              },
+              dark: '#0a0a0a', 
+              light: '#F9FAFB',
+            },
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+              display: ['Poppins', 'sans-serif'],
+            },
+            padding: {
+              'safe': 'env(safe-area-inset-bottom)',
+            }
+          },
+        },
+      }
+    </script>
+    <style>
+      ::-webkit-scrollbar { width: 8px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: #c4b5fd; border-radius: 4px; }
+      ::-webkit-scrollbar-thumb:hover { background: #7c3aed; }
+      html { scroll-behavior: smooth; -webkit-tap-highlight-color: transparent; }
+
+      /* --- APP FEEL --- */
+      body {
+        overscroll-behavior-y: none; /* Prevents pull-to-refresh on mobile */
+      }
+
+      /* --- RESPONSIVE SCALING (NOTEBOOK FIX) --- */
+      /* Reduz o tamanho base da fonte em telas de notebook/tablets grandes para evitar o efeito "Zoom" */
+      @media (min-width: 1024px) and (max-width: 1440px) {
+        html {
+          font-size: 14px; /* Default é 16px. Isso reduz tudo em ~12.5% */
+        }
+      }
+
+      /* --- A11Y STYLES --- */
+      html.a11y-grayscale { filter: grayscale(100%); }
+      html.a11y-contrast { filter: contrast(150%); }
+      html.a11y-large-text { font-size: 120%; }
+      html.a11y-readable-font * { font-family: system-ui, -apple-system, sans-serif !important; letter-spacing: 0.05em; }
+      html.a11y-highlight-links a { text-decoration: underline !important; text-decoration-color: #7c3aed !important; text-decoration-thickness: 2px !important; }
+      
+      html.a11y-grayscale img { filter: grayscale(100%); }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.555.0",
+    "framer-motion": "https://aistudiocdn.com/framer-motion@^12.23.24",
+    "react-dom": "https://aistudiocdn.com/react-dom@^19.2.0",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@0.2.1",
+    "react-helmet-async": "https://esm.sh/react-helmet-async@2.0.4?external=react,react-dom",
+    "@supabase/supabase-js": "https://aistudiocdn.com/@supabase/supabase-js@^2.87.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body class="bg-white text-gray-800 antialiased selection:bg-primary-200 selection:text-primary-900">
+    <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>

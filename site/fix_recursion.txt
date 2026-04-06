@@ -1,0 +1,29 @@
+
+-- ==============================================================================
+-- FIX RÁPIDO PARA RECURSÃO INFINITA (USE SE AS TABELAS JÁ EXISTIREM)
+-- ==============================================================================
+
+-- 1. CORRIGIR FUNÇÃO is_admin
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS BOOLEAN 
+LANGUAGE plpgsql 
+SECURITY DEFINER 
+SET search_path = public
+AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid() AND role = 'admin'
+  );
+END;
+$$;
+
+-- 2. LIMPAR E RECRIAR POLÍTICAS CRÍTICAS
+DROP POLICY IF EXISTS "Painel: Admins veem todos" ON public.profiles;
+CREATE POLICY "Painel: Admins veem todos" ON public.profiles FOR SELECT USING ( is_admin() );
+
+DROP POLICY IF EXISTS "Admin: Gerencia tudo" ON public.projects;
+CREATE POLICY "Admin: Gerencia tudo" ON public.projects FOR ALL USING ( is_admin() );
+
+DROP POLICY IF EXISTS "Cliente: Vê seus projetos" ON public.projects;
+CREATE POLICY "Cliente: Vê seus projetos" ON public.projects FOR SELECT USING ( auth.uid() = user_id );

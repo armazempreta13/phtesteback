@@ -1,0 +1,30 @@
+
+-- ==============================================================================
+-- RESET TOTAL DO BANCO DE DADOS (PERIGO: APAGA TUDO)
+-- Execute este script para remover todas as tabelas, funções e triggers do projeto.
+-- Útil para limpar o banco antes de uma nova instalação limpa.
+-- ==============================================================================
+
+-- 1. REMOVER TRIGGERS (GATILHOS)
+-- Remove os gatilhos atrelados à tabela de usuários do Supabase e projetos
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+DROP TRIGGER IF EXISTS update_projects_modtime ON public.projects;
+
+-- 2. REMOVER FUNÇÕES (FUNCTIONS)
+-- O 'CASCADE' garante que políticas dependentes também sejam removidas
+DROP FUNCTION IF EXISTS public.handle_new_user() CASCADE;
+DROP FUNCTION IF EXISTS public.update_updated_at_column() CASCADE;
+DROP FUNCTION IF EXISTS public.is_admin() CASCADE;
+
+-- 3. REMOVER TABELAS (TABLES)
+-- O 'CASCADE' remove chaves estrangeiras e dados dependentes
+DROP TABLE IF EXISTS public.project_files CASCADE;
+DROP TABLE IF EXISTS public.project_activities CASCADE;
+DROP TABLE IF EXISTS public.notifications CASCADE;
+DROP TABLE IF EXISTS public.leads CASCADE;
+DROP TABLE IF EXISTS public.blog_posts CASCADE;
+DROP TABLE IF EXISTS public.projects CASCADE;
+DROP TABLE IF EXISTS public.profiles CASCADE;
+
+-- 4. MENSAGEM DE SUCESSO (Visual)
+-- Se não houver erros vermelhos no console após rodar, o banco está limpo.

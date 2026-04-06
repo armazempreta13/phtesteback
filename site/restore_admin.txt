@@ -1,0 +1,23 @@
+
+-- ==============================================================================
+-- RESTAURAÇÃO DE ACESSO ADMIN
+-- Execute este script se você resetou o banco e perdeu o acesso ao painel.
+-- ==============================================================================
+
+-- 1. Cria Perfis para usuários órfãos (que existem no Auth mas não no Public)
+INSERT INTO public.profiles (id, email, full_name, role)
+SELECT 
+  id, 
+  email, 
+  COALESCE(raw_user_meta_data->>'full_name', 'Admin Restaurado'), 
+  'admin' -- Força o papel de Admin
+FROM auth.users
+WHERE id NOT IN (SELECT id FROM public.profiles);
+
+-- 2. Garante que todos os usuários atuais sejam Admin (útil para dev/reset)
+UPDATE public.profiles 
+SET role = 'admin' 
+WHERE role != 'admin';
+
+-- 3. Confirmação visual
+SELECT email, role FROM public.profiles;
