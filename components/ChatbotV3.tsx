@@ -185,27 +185,28 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, onNavigate,
     } catch { /* silent */ }
   };
 
-  const captureLeadComplete = async () => {
+  const captureLeadComplete = async (data?: BudgetData) => {
+    const d = data || budgetData;
     try {
-      const estimate = calculateEstimate(budgetData);
+      const estimate = calculateEstimate(d);
       const briefingJson = JSON.stringify({
-        name: budgetData.name,
-        email: budgetData.email,
-        projectType: budgetData.projectType,
-        designStatus: budgetData.designStatus,
-        functionalities: budgetData.functionalities,
-        timeline: budgetData.timeline,
-        targetAudience: budgetData.targetAudience,
-        details: budgetData.details,
-        budgetRange: budgetData.budgetRange,
-        hasDomain: budgetData.hasDomain,
+        name: d.name,
+        email: d.email,
+        projectType: d.projectType,
+        designStatus: d.designStatus,
+        functionalities: d.functionalities,
+        timeline: d.timeline,
+        targetAudience: d.targetAudience,
+        details: d.details,
+        budgetRange: d.budgetRange,
+        hasDomain: d.hasDomain,
       });
       await api.contact.submit({
-        name: budgetData.name || 'An\u00f4nimo',
-        email: budgetData.email || '',
-        subject: `Lead Chatbot Completo — ${budgetData.name} — ${budgetData.projectType || 'Em def.'}`,
+        name: d.name || 'An\u00f4nimo',
+        email: d.email || '',
+        subject: `Lead Chatbot Completo — ${d.name} — ${d.projectType || 'Em def.'}`,
         message: `OR\u00c7AMENTO COMPLETO\n${'─'.repeat(30)}\n${briefingJson}\n\nEstimativa: R$ ${estimate.min.toLocaleString('pt-BR')} — R$ ${estimate.max.toLocaleString('pt-BR')}\n\nOrigem: chatbot\nStatus: briefing_completo`,
-        service_interest: budgetData.projectType || 'Indefinido',
+        service_interest: d.projectType || 'Indefinido',
       });
     } catch { /* silent */ }
   };
@@ -486,9 +487,9 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, onNavigate,
       if (stepConfig.key === 'name') {
         captureLeadInitial(finalValue);
       }
-      // Lead capture: complete (email step)
+      // Lead capture: complete (email step) — use newData instead of stale budgetData
       if (stepConfig.key === 'email' && budgetData.name) {
-        captureLeadComplete();
+        captureLeadCompleteWithData(newData);
       }
 
       // Advance

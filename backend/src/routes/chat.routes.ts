@@ -34,7 +34,7 @@ export async function submitChatMessage(c: Ctx) {
 
 export async function listChatMessages(c: Ctx) {
   try {
-    const { page = 1, limit = 20, status } = c.req.query();
+    const { page = 1, limit = 20, status, email } = c.req.query();
     const offset = (Number(page) - 1) * Number(limit);
 
     let query = 'SELECT * FROM chat_messages';
@@ -42,11 +42,21 @@ export async function listChatMessages(c: Ctx) {
     const params: string[] = [];
     const countParams: string[] = [];
 
+    const conditions: string[] = [];
     if (status) {
-      query += ' WHERE status = ?';
-      countQuery += ' WHERE status = ?';
+      conditions.push('status = ?');
       params.push(status);
       countParams.push(status);
+    }
+    if (email) {
+      conditions.push('email = ?');
+      params.push(email.toLowerCase());
+      countParams.push(email.toLowerCase());
+    }
+
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ');
+      countQuery += ' WHERE ' + conditions.join(' AND ');
     }
 
     query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
@@ -97,7 +107,7 @@ export async function replyToChatMessage(c: Ctx) {
 // ============================================================
 // GET UNREAD COUNT — by email (for badge display)
 // ============================================================
-export async function getUnreadCount(c: Context) {
+export async function getUnreadCount(c: Ctx['$']) {
   try {
     const email = c.req.param('email');
     if (!email) {

@@ -129,7 +129,7 @@ export const ContentProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
 
       try {
-        // Load portfolio from API
+        // Load portfolio from API, merge with static projects
         const portfolioRes = await api.portfolio.getAll().catch(() => null);
         if (portfolioRes && Array.isArray(portfolioRes) && portfolioRes.length > 0 && !cancelled) {
           const mappedProjects = portfolioRes.map((raw: any) => {
@@ -145,9 +145,15 @@ export const ContentProvider: React.FC<{ children: React.ReactNode }> = ({ child
               demoUrl: raw.live_url || '',
               liveUrl: raw.github_url || '',
               featured: raw.featured === 1,
+              challenge: raw.challenge || undefined,
+              solution: raw.solution || undefined,
+              result: raw.result || undefined,
             };
           });
-          setContent(prev => ({ ...prev, projects: mappedProjects }));
+          // Merge: API projects first, then static ones not already present
+          const apiIds = new Set(mappedProjects.map((p: any) => p.id));
+          const staticExtras = STATIC_PROJECTS.filter(p => !apiIds.has(p.id));
+          setContent(prev => ({ ...prev, projects: [...mappedProjects, ...staticExtras] }));
         }
       } catch (e) {
         // API not available, keep static defaults
