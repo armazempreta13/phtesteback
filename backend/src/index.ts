@@ -191,7 +191,9 @@ app.post('/api/ai/chat/stream', setAuthContext, authMiddleware, aiChatStream);
 // ============================================================
 // 404 FALLBACK
 // ============================================================
-app.notFound((c) => c.json({ success: false, message: `Route not found: ${c.req.method} ${c.req.url}` }, 404));
+app.notFound((c) => {
+  return c.json({ success: false, message: `Route not found: ${c.req.method} ${c.req.url}` }, 404);
+});
 
 // ============================================================
 // GLOBAL ERROR HANDLER
